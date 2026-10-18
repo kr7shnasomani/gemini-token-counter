@@ -1,0 +1,58 @@
+# ESLint results are also uploaded to the Security tab so findings appear
+# alongside CodeQL. CI runs the same lint as a hard gate; this one exists for
+# the reporting and the weekly scheduled run.
+name: ESLint
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "30 10 * * 3"
+
+permissions:
+  contents: read
+
+jobs:
+  eslint:
+    name: Run eslint scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.x
+          cache: npm
+
+      # Versions come from package-lock.json rather than being pinned inline, so
+      # Dependabot keeps them current instead of them rotting in this file.
+      # --ignore-scripts so no dependency can execute code in CI either,
+      # independent of any local npm configuration.
+      - run: npm ci --ignore-scripts
+
+      # Capture the exit code rather than swallowing it: the SARIF still needs
+      # uploading on failure, but a lint error must not pass silently.
+      - name: Run ESLint
+        env:
+          SARIF_ESLINT_IGNORE_SUPPRESSED: "true"
+        run: |
+          npx eslint . \
+            --format @microsoft/eslint-formatter-sarif \
+            --output-file eslint-results.sarif || echo "failed=1" >> "$GITHUB_ENV"
+
+      - name: Upload analysis results to GitHub
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: eslint-results.sarif
+          wait-for-processing: true
+
+      - name: Fail if ESLint reported problems
+        if: env.failed == '1'
+        run: exit 1

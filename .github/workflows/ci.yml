@@ -1,4 +1,6 @@
-# Runs on every push and pull request.
+# Runs on every push and pull request. This is the workflow worth making a
+# required status check: it is what stops a broken or less-safe build reaching
+# a release tag.
 name: CI
 
 on:
@@ -15,15 +17,22 @@ jobs:
   test:
     name: Tests and lint
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The extension itself runs in a browser; this only covers the test harness.
+        node-version: [22.x]
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22.x
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
-      # --ignore-scripts so no dependency can execute code in CI either.
+      # --ignore-scripts so no dependency can execute code in CI either,
+      # independent of any local npm configuration.
       - run: npm ci --ignore-scripts
 
       # Includes the packaging and security suites: versions agree, every declared
@@ -32,11 +41,27 @@ jobs:
 
       - run: npx eslint .
 
-      - name: The store zip builds
+  package:
+    name: Manifest and packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Chromium only: there is no Firefox build of this extension.
+      - name: The release build actually produces the zip
         run: |
           set -euo pipefail
           mkdir -p dist/chrome
           cp -r src icons manifest.json LICENSE README.md THIRD_PARTY_NOTICES.md PRIVACY.md dist/chrome/
           (cd dist/chrome && zip -qr ../chrome.zip *)
           test -s dist/chrome.zip
+          # Tests, screenshots and design sources must never reach a published zip.
+          if unzip -l dist/chrome.zip | grep -qE "node_modules|/test/|img/|design/"; then
+            echo "::error::a non-extension directory leaked into the zip"
+            exit 1
+          fi
+          # Every file the manifest names is in the zip.
+          for f in $(jq -r '[.icons[], .action.default_icon[], .action.default_popup, (.content_scripts[] | .js[], (.css // [])[])] | unique[]' manifest.json); do
+            unzip -l dist/chrome.zip | grep -q " $f$" || { echo "::error::$f is declared but not packaged"; exit 1; }
+          done
           echo "chrome $(du -h dist/chrome.zip | cut -f1)"

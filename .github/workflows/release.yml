@@ -1,0 +1,187 @@
+name: Build and Release Extension
+
+# Bumping "version" in manifest.json on main is the release: this creates the
+# v<version> tag and the GitHub release. Pushes that touch manifest.json without
+# changing the version (a permission edit, say) find the tag already there and stop.
+# Run it by hand (from main) to retry a release that failed part-way (it updates
+# the existing one). Pushing a v*.*.* tag by hand does nothing.
+on:
+  push:
+    branches: ["main"]
+    paths: ["manifest.json"]
+  workflow_dispatch:
+
+# Two quick pushes must not race to create the same tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# Default to read-only; the release job opts into what it needs.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Is this a new version?
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: version
+        run: |
+          set -euo pipefail
+          # A manual run can be started from any branch; releases come from main only.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Releases are cut from main, not $GITHUB_REF"
+            exit 1
+          fi
+          VERSION=$(jq -r .version manifest.json)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::manifest version '$VERSION' is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          TAG="v$VERSION"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] &&
+             git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$TAG already exists, nothing to release"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify:
+    name: Verify before publishing
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.x
+          cache: npm
+
+      # --ignore-scripts so no dependency can execute code in CI either,
+      # independent of any local npm configuration.
+      - run: npm ci --ignore-scripts
+
+      # The tag is public the moment the release is created, so everything that
+      # can fail should fail here rather than after artifacts are attached.
+      # (npm test also checks manifest.json and package.json agree.)
+      - run: npm test
+      - run: npx eslint .
+
+  build-and-release:
+    name: Build and publish
+    needs: [check, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # only this job writes: it creates the tag and the release
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+      # Exposed at job level so the upload step's `if` can test for it.
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Chromium only (Chrome, Edge, Brave, Opera, Vivaldi, Arc): there is no
+      # Firefox build of this extension.
+      - name: Build Artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p dist/chrome
+          cp -r src icons manifest.json LICENSE README.md THIRD_PARTY_NOTICES.md PRIVACY.md dist/chrome/
+          (cd dist/chrome && zip -r "../../gemini-token-counter-chrome-${TAG}.zip" *)
+
+      - name: Check the artifacts are sane
+        run: |
+          set -euo pipefail
+          ZIP="gemini-token-counter-chrome-${TAG}.zip"
+          test -s "$ZIP" || { echo "::error::$ZIP is missing or empty"; exit 1; }
+          # Tests, node_modules, screenshots and design sources must never reach a
+          # published zip.
+          if unzip -l "$ZIP" | grep -qE "node_modules|/test/|img/|design/"; then
+            echo "::error::a non-extension directory leaked into the artifact"
+            exit 1
+          fi
+          # Publishing a zip whose manifest disagrees with the tag would be worse
+          # than failing the release.
+          unzip -p "$ZIP" manifest.json |
+            jq -e --arg v "${TAG#v}" '.version == $v' > /dev/null
+
+      - name: Record checksums
+        run: |
+          set -euo pipefail
+          sha256sum gemini-token-counter-*.zip | tee SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ needs.check.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            gemini-token-counter-chrome-*.zip
+            SHA256SUMS.txt
+          generate_release_notes: true
+
+      # Uploads the package as a draft in the Web Store dashboard. It deliberately
+      # does NOT call :publish, so nothing is submitted for review until you press
+      # the button yourself.
+      #
+      # Written with curl rather than a marketplace action on purpose: these
+      # credentials can publish to every user of the extension, and no third-party
+      # action needs that level of access.
+      #
+      # Skipped automatically when the secrets are absent, so forks still build.
+      # The item id is a secret too (CWS_ITEM_ID): the extension has no store
+      # listing yet, so there is no id to write here.
+      - name: Upload package to the Chrome Web Store
+        if: env.CWS_CLIENT_ID != ''
+        run: |
+          set -euo pipefail
+          ZIP="gemini-token-counter-chrome-${TAG}.zip"
+          if [ -z "${CWS_ITEM_ID:-}" ]; then
+            echo "::error::CWS_ITEM_ID is not set: add the store listing's item id as a repository secret"
+            exit 1
+          fi
+
+          ACCESS_TOKEN=$(curl -sS --fail-with-body -X POST \
+            https://oauth2.googleapis.com/token \
+            -d client_id="$CWS_CLIENT_ID" \
+            -d client_secret="$CWS_CLIENT_SECRET" \
+            -d refresh_token="$CWS_REFRESH_TOKEN" \
+            -d grant_type=refresh_token | jq -r '.access_token // empty')
+
+          if [ -z "$ACCESS_TOKEN" ]; then
+            echo "::error::Could not exchange the refresh token. Has it been revoked?"
+            exit 1
+          fi
+
+          RESPONSE=$(curl -sS -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$ZIP" \
+            "https://chromewebstore.googleapis.com/upload/v2/publishers/${CWS_PUBLISHER_ID}/items/${CWS_ITEM_ID}:upload")
+
+          echo "$RESPONSE" | jq .
+          STATE=$(echo "$RESPONSE" | jq -r '.uploadState // empty')
+
+          if [ "$STATE" != "SUCCESS" ]; then
+            echo "::error::Upload failed ($STATE). Most common cause: the version in manifest.json is not higher than the one already in the store."
+            echo "$RESPONSE" | jq -r '.itemError[]?.error_detail // empty'
+            exit 1
+          fi
+
+          echo "::notice::Uploaded $(echo "$RESPONSE" | jq -r .crxVersion) as a draft. Press Submit for review in the dashboard when ready."
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_ITEM_ID: ${{ secrets.CWS_ITEM_ID }}

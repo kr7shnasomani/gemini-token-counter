@@ -141,7 +141,9 @@ Real Gemini responses the suites use are in `test/fixtures/`, with a note on whe
 
 ## Releasing
 
-Bump `version` in `manifest.json`, `package.json` and `package-lock.json` (the tests fail if they disagree). CI runs the tests and lint on every push and pull request and checks the store zip builds. Every action is pinned to a commit SHA. See [SECURITY.md](SECURITY.md) for the dependency policy.
+Bump `version` in `manifest.json`, `package.json` and `package-lock.json` (the tests fail if they disagree) and push to `main`. If no `v<version>` tag exists yet, the release workflow runs the tests and lint, creates the tag and release, builds the Chrome zip, checks nothing unwanted was packaged and the zip's version matches the tag, and publishes it with a `SHA256SUMS.txt`. When the Chrome Web Store credentials (and the listing's `CWS_ITEM_ID`) are set as repository secrets it also uploads the zip to the store as a draft, which still needs **Submit for review** in the developer dashboard; without them that step is skipped. Releases are cut from `main` only, and a manual run from the Actions tab retries a failed release.
+
+Alongside it: CI runs the tests, lint and a packaging check on every push and pull request; ESLint results go to the Security tab, also weekly; pull requests get a dependency review; OpenSSF Scorecard runs weekly; and Dependabot watches the GitHub Actions and the npm dev dependencies. Every action is pinned to a commit SHA. See [SECURITY.md](SECURITY.md) for the dependency policy.
 
 ## Credits
 - Token counting via [gpt-tokenizer](https://github.com/niieani/gpt-tokenizer) (MIT)
