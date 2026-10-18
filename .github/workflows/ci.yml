@@ -1,0 +1,42 @@
+# Runs on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# Read-only. Nothing here needs to write to the repository.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.x
+          cache: npm
+
+      # --ignore-scripts so no dependency can execute code in CI either.
+      - run: npm ci --ignore-scripts
+
+      # Includes the packaging and security suites: versions agree, every declared
+      # file exists, permissions have not widened.
+      - run: npm test
+
+      - run: npx eslint .
+
+      - name: The store zip builds
+        run: |
+          set -euo pipefail
+          mkdir -p dist/chrome
+          cp -r src icons manifest.json LICENSE README.md THIRD_PARTY_NOTICES.md PRIVACY.md dist/chrome/
+          (cd dist/chrome && zip -qr ../chrome.zip *)
+          test -s dist/chrome.zip
+          echo "chrome $(du -h dist/chrome.zip | cut -f1)"

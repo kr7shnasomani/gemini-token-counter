@@ -1,0 +1,22 @@
+{
+  "name": "gemini-token-counter",
+  "version": "1.0.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kr7shnasomani/gemini-token-counter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kr7shnasomani/gemini-token-counter/issues"
+  },
+  "description": "Tests for the Gemini Token Counter browser extension. The extension itself has no build step and no runtime dependencies.",
+  "scripts": {
+    "test": "node test/run.js",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@microsoft/eslint-formatter-sarif": "^3.1.0",
+    "eslint": "^10.12.0"
+  }
+}

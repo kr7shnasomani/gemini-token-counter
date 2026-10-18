@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Token Counter",
+  "version": "1.0.0",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "optional_host_permissions": ["https://gemini.google.com/*"],
+  "description": "Token counter and usage bars on Gemini. Export any chat to Markdown, and check your limits from the toolbar.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "96": "icons/icon96.png",
+    "128": "icons/icon128.png",
+    "256": "icons/icon256.png"
+  },
+  "action": {
+    "default_title": "Gemini Token Counter",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "96": "icons/icon96.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "css": ["src/styles.css"],
+      "js": [
+        "src/content/constants.js",
+        "src/content/bridge-client.js",
+        "src/vendor/o200k_base.js",
+        "src/content/conversation.js",
+        "src/content/export.js",
+        "src/content/ui.js",
+        "src/content/main.js"
+      ]
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["src/injected/bridge.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}

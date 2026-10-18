@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<title>Gemini Token Counter</title>
+	<link rel="stylesheet" href="popup.css" />
+</head>
+
+<body>
+	<!-- Built as one of Gemini's own menus (its settings menu, its model picker):
+	     a top bar, then a muted section heading over compact rows. -->
+	<header class="top">
+		<div class="top__name">
+			<img class="top__mark" src="../../icons/icon96.png" alt="" width="20" height="20" />
+			<span>Token Counter</span>
+			<span class="badge" id="plan" hidden></span>
+		</div>
+		<div class="top__actions">
+			<button class="icon" id="refresh" type="button" aria-label="Refresh usage" data-tip="Refresh">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+					stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+					<path d="M19 12a7 7 0 1 1-2.05-4.95" />
+					<polyline points="19 4.5 19 8.5 15 8.5" />
+				</svg>
+			</button>
+			<button class="icon" id="settingsBtn" type="button" aria-label="Settings" aria-expanded="false" aria-controls="settings"
+				data-tip="Settings">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+					stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+					<circle cx="12" cy="12" r="3" />
+					<path
+						d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+				</svg>
+			</button>
+			<button class="icon" id="feedbackBtn" type="button" aria-label="Send feedback" aria-expanded="false" aria-controls="feedback"
+				data-tip="Send feedback">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+					stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+					<path d="M4 4.5h16v11.5H8.5L4 20.5z" />
+					<path d="M12 7.5v4.5M12 14.25v.01" />
+				</svg>
+			</button>
+		</div>
+	</header>
+
+	<div class="head">
+		<button class="icon" id="back" type="button" aria-label="Back to usage limits" hidden>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+				stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+				<path d="M19 12H5M11 6l-6 6 6 6" />
+			</svg>
+		</button>
+		<h1 class="head__title" id="title">Usage limits</h1>
+	</div>
+	<p class="status" id="stamp" role="status" aria-live="polite"></p>
+
+	<div id="content" hidden>
+		<section class="item" id="sessionRow">
+			<div class="item__line">
+				<span>Current usage</span>
+				<span id="sessionValue"></span>
+			</div>
+			<div class="track">
+				<div class="fill" id="sessionFill"></div>
+			</div>
+			<span class="item__sub" id="sessionReset"></span>
+		</section>
+
+		<section class="item" id="weeklyRow">
+			<div class="item__line">
+				<span>Weekly limit</span>
+				<span id="weeklyValue"></span>
+			</div>
+			<div class="track">
+				<div class="fill" id="weeklyFill"></div>
+			</div>
+			<span class="item__sub" id="weeklyReset"></span>
+		</section>
+	</div>
+
+	<p class="item item__sub" id="empty">No usage read yet. Refresh, or open Gemini.</p>
+
+	<div id="settings" hidden>
+		<h2 class="group">In the chat</h2>
+		<label class="opt"><span>Token counter</span><input type="checkbox" role="switch" data-key="tokenCounter" /><span class="sw"></span></label>
+		<label class="opt"><span>Export button</span><input type="checkbox" role="switch" data-key="exportButton" /><span class="sw"></span></label>
+		<h2 class="group">Usage row</h2>
+		<label class="opt"><span>Hourly bar</span><input type="checkbox" role="switch" data-key="sessionBar" /><span class="sw"></span></label>
+		<label class="opt"><span>Weekly bar</span><input type="checkbox" role="switch" data-key="weeklyBar" /><span class="sw"></span></label>
+		<label class="opt"><span>Refresh button</span><input type="checkbox" role="switch" data-key="usageRefresh" /><span class="sw"></span></label>
+	</div>
+
+	<div class="feedback" id="feedback" hidden>
+		<textarea id="feedbackText" rows="4" placeholder="Describe the issue" aria-label="Describe the issue"></textarea>
+		<p class="item__sub" id="feedbackNote">Opens a GitHub issue for you to check first. It adds your version, browser, plan and page details, never chat text.</p>
+		<div class="btnRow">
+			<button class="btn" id="feedbackCancel" type="button">Cancel</button>
+			<button class="btn btn--primary" id="feedbackSend" type="button">Continue to GitHub</button>
+		</div>
+	</div>
+
+	<script src="../content/constants.js"></script>
+	<script src="popup.js"></script>
+</body>
+
+</html>

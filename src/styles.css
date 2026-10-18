@@ -1,0 +1,551 @@
+/* The Claude Token Counter's parts and layout, drawn in Gemini's own look.
+   Every colour is one of Gemini's design tokens (`--lumi-sys-*`, `--gem-sys-*`),
+   which Gemini sets on `body.theme-host` and switches itself for light and dark,
+   so ours follow its theme with no script. The fallbacks are Gemini's dark values,
+   measured on 2026-10-18; light is the same tokens, Gemini's light values. */
+.gc-chipBox,
+.gc-header,
+.gc-usageRow,
+.gc-tooltip,
+.gc-popover,
+.gc-menu {
+	--gc-fg: var(--lumi-sys-color--on-surface, #e6e6e6);
+	--gc-muted: var(--lumi-sys-color--on-surface-variant, rgba(255, 255, 255, 0.55));
+	--gc-hover: var(--lumi-sys-color-states--hover-on-surface, rgba(230, 230, 230, 0.08));
+	--gc-line: var(--lumi-sys-color--on-surface-low, rgba(255, 255, 255, 0.12));
+	/* Menus and popovers: Gemini's menu surface and its one elevation. */
+	--gc-surface: var(--lumi-sys-color--surface-bright, #1f1f1f);
+	--gc-shadow: var(--lumi-sys-elevation--level1, 0 0 20px 0 rgba(0, 0, 0, 0.28));
+	/* The chip: the same filled pill as Gemini's "Get app" button. */
+	--gc-chip-bg: var(--lumi-sys-color--surface-dim, #171717);
+	/* Bars: Gemini blue on a quiet track, the marker in the text colour. The other
+	   way round (Gemini's usage-page white fill, a blue marker) lost the marker
+	   wherever it crossed the fill. */
+	--gc-track: var(--lumi-sys-color--on-surface-low, rgba(255, 255, 255, 0.12));
+	--gc-fill: var(--gem-sys-color--blue-primary, #4e8ff8);
+	--gc-fill-caution: var(--gem-sys-color--orange-primary, #e86e00);
+	--gc-fill-warn: var(--lumi-sys-color--error, #ff4c45);
+	--gc-marker: var(--lumi-sys-color--on-surface, #e6e6e6);
+	--gc-focus: var(--mat-focus-indicator-border-color, #a8c7fa);
+	/* Gemini's tooltip: inverted, measured off its own (#e6e6e6 on #171717). */
+	--gc-tip-bg: var(--lumi-sys-color--on-surface, #e6e6e6);
+	--gc-tip-fg: var(--lumi-sys-color--surface-dim, #171717);
+	font-family: "Google Sans Flex", "Google Sans", "Helvetica Neue", sans-serif;
+	/* Gemini's text runs Google Sans Flex slightly narrow (wdth 92). */
+	font-variation-settings: "wdth" 92, "ROND" 0;
+	letter-spacing: 0;
+}
+
+/* The token chip, held to the top left of the chat column (CounterUI._alignChip
+   sets top and left), level with Gemini's top-bar buttons. */
+.gc-chipBox {
+	position: absolute;
+	top: 16px;
+	left: 24px;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	/* Room for the export button, which sits here when Gemini has no top bar. */
+	gap: 8px;
+	user-select: none;
+}
+
+/* A Gemini pill button: 36px, fully round, surface-dim, a state layer on hover. */
+.gc-chip {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	box-sizing: border-box;
+	height: 36px;
+	padding: 0 16px;
+	border-radius: 9999px;
+	background: var(--gc-chip-bg);
+	color: var(--gc-fg);
+	font-size: 14px;
+	line-height: 20px;
+	font-weight: 500;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+	transition: background-color 150ms ease;
+}
+
+/* Gemini's state layer, mixed into the fill so the hover fades rather than snaps. */
+.gc-chip:hover,
+.gc-chip[aria-expanded="true"] {
+	background-color: color-mix(in srgb, var(--gc-chip-bg), var(--gc-fg) 8%);
+}
+
+/* The label the chip does not show, kept for screen readers. */
+.gc-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+/* Top bar: the export button, beside Gemini's conversation menu. No margin: the
+   group spaces its children itself. */
+.gc-header {
+	display: flex;
+	align-items: center;
+	user-select: none;
+}
+
+/* Usage row: session + weekly, in Gemini's small text. */
+.gc-usageRow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 12px;
+	/* A narrow window has no room for both windows on one line: each group takes
+	   its own line rather than overlap. */
+	flex-wrap: wrap;
+	row-gap: 4px;
+	position: relative;
+	box-sizing: border-box;
+	width: 100%;
+	margin: 4px auto 0;
+	padding-inline: 8px;
+	color: var(--gc-muted);
+	font-size: 12px;
+	line-height: 16px;
+	user-select: none;
+	transition: opacity 150ms ease;
+}
+
+/* Inside Gemini's input card: its own line under the text field, the card growing
+   to take it. Insets measured on the card (2026-10-18): the "+" icon starts 24px
+   in, the mic button ends 16px in, and the field leaves 12px below itself. */
+.gc-usageRow--inCard {
+	max-width: none;
+	margin: -4px 0 0;
+	/* 52px on the right: the refresh button's place, outside the flow (below). */
+	padding: 0 52px 14px 24px;
+}
+
+/* Refreshing, or left over after a failed read: the bars fade, the text stays
+   readable (dimming it too took it under 4.5:1). The tooltip says how old. */
+.gc-usageRow--dim .gc-bar,
+.gc-usageRow--stale .gc-bar {
+	opacity: 0.45;
+}
+
+.gc-usageGroup {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	/* Room for the label with its reset time and a usable bar; below this the
+	   row wraps instead of overlapping. */
+	flex: 1 1 240px;
+	min-width: 0;
+}
+
+.gc-usageGroup--single {
+	width: 100%;
+}
+
+.gc-usageGroup--weekly {
+	justify-content: flex-end;
+}
+
+.gc-usageText {
+	white-space: nowrap;
+}
+
+/* No current figure ("—"): already muted, and any fainter fails contrast. */
+.gc-usageUnknown {
+	font-variant-numeric: tabular-nums;
+}
+
+/* Usage bars: Gemini's usage-page bar, a fully round track with a round fill,
+   at the height of the small text beside it. */
+.gc-bar {
+	position: relative;
+	box-sizing: border-box;
+	width: 100%;
+	height: 6px;
+	flex: 1;
+	border-radius: 9999px;
+	background: var(--gc-track);
+	overflow: visible;
+	user-select: none;
+}
+
+.gc-bar__fill {
+	width: 0%;
+	height: 100%;
+	border-radius: 9999px;
+	background: var(--gc-fill);
+	transition: width 200ms cubic-bezier(0.2, 0, 0, 1), background-color 200ms ease;
+}
+
+.gc-bar__fill.gc-caution {
+	background: var(--gc-fill-caution);
+}
+
+.gc-bar__fill.gc-warn {
+	background: var(--gc-fill-warn);
+}
+
+/* Elapsed-time marker: how far through the reset window we are, so the fill
+   can be read against it. Only drawn when the window length is known. Within
+   the bar's height, as in the Claude extension, in the text colour, which reads
+   on both the blue fill and the track. */
+.gc-bar__marker {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0%;
+	width: 2px;
+	margin-left: -1px;
+	border-radius: 1px;
+	background: var(--gc-marker);
+	pointer-events: none;
+}
+
+/* Tooltip: Gemini's own, measured 2026-10-18 (13px/17px, 8px 16px, radius 12px,
+   no shadow), so hovering ours looks like hovering Gemini's. Gemini caps its own at
+   200px for labels of a few words; ours explain, so 240px keeps them to a few lines. */
+.gc-tooltip {
+	position: fixed;
+	z-index: 9999;
+	box-sizing: border-box;
+	max-width: 240px;
+	padding: 8px 16px;
+	border-radius: 12px;
+	background: var(--gc-tip-bg);
+	color: var(--gc-tip-fg);
+	font-size: 13px;
+	line-height: 17px;
+	font-weight: 400;
+	text-wrap: pretty;
+	user-select: none;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.gc-tooltip--on {
+	opacity: 1;
+}
+
+/* A tooltip with an action can be reached and clicked. */
+.gc-tooltip--action {
+	pointer-events: auto;
+	cursor: pointer;
+}
+
+.gc-tooltip--action:hover .gc-tooltip__hint {
+	opacity: 1;
+	text-decoration: underline;
+}
+
+/* A trailing cue, muted. */
+.gc-tooltip__hint {
+	margin-left: 6px;
+	opacity: 0.65;
+}
+
+.gc-tooltipTrigger {
+	user-select: none;
+}
+
+.gc-tooltipTrigger[aria-haspopup] {
+	cursor: pointer;
+}
+
+/* Gemini's focus ring, measured on its ⋮ and "New chat": a 1px ring in its focus
+   colour, no offset. Menu rows show focus as Gemini's do, by their highlight. */
+.gc-tooltipTrigger[role="button"]:focus-visible,
+.gc-iconBtn:focus-visible {
+	outline: 1px solid var(--gc-focus);
+	outline-offset: 0;
+}
+
+/* Popover and menu: Gemini's menu surface (surface-bright, radius 20, 8px in,
+   its level-1 shadow), measured off the model picker and the ⋮ menu. */
+.gc-popover,
+.gc-menu {
+	position: fixed;
+	z-index: 9999;
+	box-sizing: border-box;
+	background: var(--gc-surface);
+	color: var(--gc-fg);
+	border-radius: 20px;
+	box-shadow: var(--gc-shadow);
+	font-size: 13px;
+	line-height: 17px;
+	user-select: none;
+	animation: gc-pop-in 100ms ease-out;
+}
+
+/* Grown from the control that opened it. */
+.gc-popover {
+	transform-origin: top left;
+}
+
+.gc-menu {
+	transform-origin: top right;
+}
+
+@keyframes gc-pop-in {
+	from { opacity: 0; transform: scale(0.97); }
+	to { opacity: 1; transform: none; }
+}
+
+.gc-popover {
+	width: 324px;
+	padding: 8px;
+}
+
+/* The Claude extension's table: a model per row, a plan per column. */
+.gc-popover__row {
+	display: grid;
+	grid-template-columns: 1fr repeat(4, 44px);
+	padding: 6px 8px;
+	white-space: nowrap;
+}
+
+.gc-popover__row span:not(:first-child) {
+	text-align: right;
+	color: var(--gc-muted);
+}
+
+.gc-popover__row--head {
+	color: var(--gc-muted);
+}
+
+/* The plan this account is on. Specific enough to beat the muted cell colour above. */
+.gc-popover__row.gc-popover__row--head span.gc-popover__plan--current {
+	color: var(--gc-fg);
+	font-variation-settings: "wdth" 92, "ROND" 0, "wght" 540;
+	font-weight: 540;
+}
+
+.gc-popover__note {
+	text-wrap: pretty;
+	margin: 6px 0 0;
+	padding: 10px 8px 4px;
+	border-top: 1px solid var(--gc-line);
+	color: var(--gc-muted);
+}
+
+/* Icons: Gemini's own symbol font when it is loaded (CounterUI's symbolIcon sets
+   data-glyph), drawn at its settings (rounded, light: wght 300 at 24px, 320 below);
+   otherwise the SVG inside. */
+.gc-sym {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--gc-sym-size, 24px);
+	height: var(--gc-sym-size, 24px);
+	flex-shrink: 0;
+}
+
+.gc-sym[data-glyph]::before {
+	content: attr(data-glyph);
+	font-family: "Luminous Symbols";
+	font-size: var(--gc-sym-size, 24px);
+	line-height: 1;
+	font-weight: normal;
+	font-style: normal;
+	letter-spacing: normal;
+	text-transform: none;
+	white-space: nowrap;
+	word-wrap: normal;
+	direction: ltr;
+	font-feature-settings: "liga";
+	-webkit-font-smoothing: antialiased;
+	font-variation-settings: "FILL" 0, "GRAD" 0, "ROND" 100, "opsz" 20, "wght" 320;
+}
+
+.gc-exportIcon[data-glyph]::before {
+	font-variation-settings: "FILL" 0, "GRAD" 0, "ROND" 100, "opsz" 24, "wght" 300;
+}
+
+.gc-sym[data-glyph] .gc-sym__svg {
+	display: none;
+}
+
+/* Icon buttons: Gemini's, a round state layer on hover. */
+.gc-iconBtn {
+	color: var(--gc-muted);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	box-sizing: border-box;
+	padding: 0;
+	background: none;
+	border: none;
+	border-radius: 9999px;
+	cursor: pointer;
+	transition: background-color 150ms ease, color 150ms ease;
+}
+
+.gc-iconBtn:hover {
+	color: var(--gc-fg);
+	background: var(--gc-hover);
+}
+
+/* The refresh button at the end of the usage row: 32px, as Gemini's mic beside it,
+   without making the line taller. */
+.gc-refreshBtn {
+	width: 32px;
+	height: 32px;
+	margin: -8px -8px -8px -4px;
+}
+
+/* In the card it sits outside the wrapping flow, at the end of the last line, so a
+   wrapped row's two bars end at the same edge. */
+.gc-usageRow--inCard .gc-refreshBtn {
+	position: absolute;
+	right: 12px;
+	bottom: 6px;
+	margin: 0;
+}
+
+.gc-refreshBtn--error {
+	color: var(--gc-fill-warn);
+}
+
+@keyframes gc-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.gc-refreshBtn--spinning .gc-refreshIcon {
+	animation: gc-spin 0.7s linear infinite;
+}
+
+/* Docked beside the top-right controls: sized and coloured as Gemini's own icon
+   buttons there (36px, round, a 24px light-weight icon in the text colour). */
+.gc-exportBtn {
+	width: 36px;
+	height: 36px;
+	color: var(--gc-fg);
+}
+
+.gc-exportBtn[aria-expanded="true"] {
+	background: var(--gc-hover);
+}
+
+.gc-exportBtn--busy {
+	opacity: 0.38;
+	pointer-events: none;
+}
+
+.gc-exportBtn--error {
+	color: var(--gc-fill-warn) !important;
+}
+
+.gc-menu {
+	display: flex;
+	flex-direction: column;
+	min-width: 200px;
+	padding: 8px;
+}
+
+/* Gemini's menu row: 8px in, radius 12, a 20px icon 8px before the label. */
+.gc-menuItem {
+	appearance: none;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: none;
+	border: none;
+	color: inherit;
+	font: inherit;
+	font-variation-settings: inherit;
+	text-align: left;
+	white-space: nowrap;
+	padding: 8px;
+	border-radius: 12px;
+	cursor: pointer;
+}
+
+.gc-menuItem .gc-sym {
+	flex-shrink: 0;
+}
+
+.gc-menuItem:hover,
+.gc-menuItem:focus-visible {
+	background: var(--gc-hover);
+}
+
+.gc-menuItem:focus:not(:focus-visible) {
+	outline: none;
+}
+
+/* Last resort when Gemini's layout leaves no place for a part: float it over the
+   page rather than lose it. See CounterUI._ensureShown. */
+.gc-floating {
+	position: fixed !important;
+	left: 50% !important;
+	transform: translateX(-50%);
+	z-index: 9998;
+	width: auto !important;
+	max-width: calc(100vw - 24px) !important;
+	margin: 0 !important;
+	padding: 6px 16px !important;
+	border-radius: 9999px;
+	background: var(--gc-surface);
+	color: var(--gc-fg);
+	box-shadow: var(--gc-shadow);
+}
+
+.gc-floating .gc-chip {
+	height: auto;
+	padding: 0;
+	background: none;
+}
+
+.gc-chipBox.gc-floating {
+	top: 56px !important;
+}
+
+.gc-usageRow.gc-floating {
+	bottom: 8px;
+}
+
+/* Out of the composer the row has no width to share out. */
+.gc-usageRow.gc-floating .gc-usageGroup {
+	flex: none;
+}
+
+.gc-usageRow.gc-floating .gc-refreshBtn {
+	position: static;
+	margin: -8px -8px -8px -4px;
+}
+
+.gc-usageRow.gc-floating .gc-bar {
+	flex: none;
+	width: 72px;
+}
+
+/* Motion only where it says something, and none for those who asked for none. */
+@media (prefers-reduced-motion: reduce) {
+	.gc-popover,
+	.gc-menu {
+		animation: none;
+	}
+
+	.gc-bar__fill,
+	.gc-chip,
+	.gc-iconBtn,
+	.gc-tooltip {
+		transition: none;
+	}
+
+	.gc-refreshBtn--spinning .gc-refreshIcon {
+		animation-duration: 2s;
+	}
+}
+
+/* Hide optional elements completely (no layout space) */
+.gc-hidden {
+	display: none !important;
+}
