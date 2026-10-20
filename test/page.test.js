@@ -197,25 +197,38 @@ async function page({ pathname = '/u/1/app/80eeb4ca73c8a8fa', store = {}, usage 
 	}
 
 	section('popup snapshot');
+	// The page's inline data, as Gemini serves it, with the signed-in email in it.
+	const withEmail = (c) => { c.document.scripts = [{ textContent: 'window.WIZ_global_data = {"SNlM0e":"tok","oPEP7c":"someone@example.com"};' }]; };
 	{
-		const { chrome } = await page({ build: (c) => { c.document.body.appendChild(new (require('./harness').El)('span').answers('.mavatar-user-info')); } });
-		const snap = chrome._store['gc:usageSnapshot'];
-		t('snapshot written for the popup', snap && snap.session.utilization === 67);
+		const { chrome } = await page({ build: (c) => { c.document.body.appendChild(new (require('./harness').El)('span').answers('.mavatar-user-info')); withEmail(c); } });
+		const snap = chrome._store['gc:usageSnapshot:1'];
+		t('snapshot written for the popup, under its account', snap && snap.session.utilization === 67);
 		t('carries the account it belongs to', snap.account === '1');
+		t('and its email, for the popup\u2019s picker', snap.email === 'someone@example.com');
+		t('nothing under a key shared by every account', !('gc:usageSnapshot' in chrome._store));
 	}
 	{
-		const store = { 'gc:usageSnapshot': { account: '0', updatedAt: 1, session: { utilization: 99, resets_at: later(3600e3) }, weekly: null } };
+		const { chrome } = await page();
+		t('a page with no email in its data stores none', chrome._store['gc:usageSnapshot:1']?.email === '');
+	}
+	{
+		const { chrome } = await page({ build: (c) => { c.document.scripts = [{ textContent: '{"oPEP7c":"not an email"}' }]; } });
+		t('something that is not an email is not stored as one', chrome._store['gc:usageSnapshot:1']?.email === '');
+	}
+	{
+		const store = { 'gc:usageSnapshot:0': { account: '0', updatedAt: 1, session: { utilization: 99, resets_at: later(3600e3) }, weekly: null } };
 		// What the row showed while the live read was out, read from the page the build hook saw.
 		let pageDom = null;
 		let seen = null;
-		const { dom } = await page({ store, build: (_c, d) => { pageDom = d; }, usage: () => { seen = pageDom.inner.lastElementChild.textContent; return [2, []]; } });
+		const { dom, chrome } = await page({ store, build: (_c, d) => { pageDom = d; }, usage: () => { seen = pageDom.inner.lastElementChild.textContent; return [2, []]; } });
 		t('the row was read while the live read was out', typeof seen === 'string');
-		t('another account’s stored reading is not shown', !String(seen).includes('99%') && !dom.inner.lastElementChild.textContent.includes('99%'));
+		t('another account\u2019s stored reading is not shown', !String(seen).includes('99%') && !dom.inner.lastElementChild.textContent.includes('99%'));
+		t('and stays stored for its own account', chrome._store['gc:usageSnapshot:0']?.session.utilization === 99);
 	}
 	{
-		const store = { 'gc:usageSnapshot': { account: '1', updatedAt: 1, session: { utilization: 42, resets_at: later(3600e3) }, weekly: null } };
+		const store = { 'gc:usageSnapshot:1': { account: '1', updatedAt: 1, session: { utilization: 42, resets_at: later(3600e3) }, weekly: null } };
 		const { dom, GC } = await page({ store, usage: () => { throw new Error('offline'); } });
-		t('this account’s stored reading shows while the live one fails', dom.inner.lastElementChild.textContent.includes('Hourly: 42%'));
+		t('this account\u2019s stored reading shows while the live one fails', dom.inner.lastElementChild.textContent.includes('Hourly: 42%'));
 		t('and is marked a seed, not a reading', GC.main.readState().seeded === true);
 	}
 
@@ -297,7 +310,7 @@ async function page({ pathname = '/u/1/app/80eeb4ca73c8a8fa', store = {}, usage 
 
 	section('diagnostics');
 	{
-		const { chrome, GC } = await page();
+		const { chrome, GC } = await page({ build: withEmail });
 		GC.main.tick();
 		for (let i = 0; i < 5; i++) await flush();
 		const d = chrome._store['gc:diag'];
@@ -305,6 +318,7 @@ async function page({ pathname = '/u/1/app/80eeb4ca73c8a8fa', store = {}, usage 
 		t('anchors named', d.export === 'topbar' && d.chip === 'column' && d.composer === 'in-card', JSON.stringify(d));
 		t('build from the bridge', d.build === 'boq_test');
 		t('no conversation id or text in it', !JSON.stringify(d).includes('80eeb4ca') && !JSON.stringify(d).includes('hello'));
+		t('no email in it, though the page has one', !JSON.stringify(d).includes('@'));
 	}
 
 	section('usage refresh');

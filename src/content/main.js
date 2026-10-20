@@ -104,15 +104,26 @@
 	}
 
 	// --- popup snapshot -------------------------------------------------------
-	// The popup is its own document and cannot read this script's memory, so the
-	// last reading is mirrored into extension storage, with its own timestamp.
+	// The popup is its own document and cannot read this script's memory, so each
+	// account's last reading is mirrored into extension storage under its own key,
+	// with its own timestamp and the account's email for the popup's picker.
+
+	// The page's account does not change without a full load, so once found its email is kept.
+	let email = '';
+	function readEmail() {
+		for (const script of document.scripts || []) {
+			if (email) break;
+			email = GC.pageEmail(script.textContent);
+		}
+		return email;
+	}
 
 	async function persistSnapshot(windows) {
 		const storage = GC.getStorage();
 		if (!storage) return;
 		try {
 			await storage.set({
-				[GC.SNAPSHOT_KEY]: { updatedAt: Date.now(), account: account(), plan, session: windows.session, weekly: windows.weekly }
+				[GC.snapshotKey(account())]: { updatedAt: Date.now(), account: account(), email: readEmail(), plan, session: windows.session, weekly: windows.weekly }
 			});
 		} catch (e) {
 			GC.noteError('snapshot write', e);
@@ -125,7 +136,8 @@
 	 * shown as the empty window that followed it.
 	 */
 	async function seedFromSnapshot() {
-		const snapshot = (await GC.storageGet(GC.SNAPSHOT_KEY))?.[GC.SNAPSHOT_KEY];
+		const key = GC.snapshotKey(account());
+		const snapshot = (await GC.storageGet(key))?.[key];
 		if (!snapshot || usageState || snapshot.account !== account()) return;
 		// One that has reset since is followed by the next, empty: shown as that.
 		const usable = (w) => typeof w?.utilization === 'number' && Number.isFinite(Date.parse(w.resets_at));

@@ -10,17 +10,19 @@
 	src: url("../vendor/google-sans-flex-latin.woff2") format("woff2");
 }
 
-/* The popup is drawn as one of Gemini's own menus, measured on gemini.google.com
-   on 2026-10-19 (the settings menu and the model picker): a `surface-bright`
-   panel padded 8px, muted 13px/17px section headings padded 8px 12px, and rows
-   of 13px/17px text in Google Sans Flex at wdth 92. Every size here is one of
-   14 (the name), 13 (everything else) or 11 (the plan badge). Colours are lumi
-   tokens copied as values; light and dark follow the browser. */
+/* The popup is drawn as a page of Google's own settings (Material 3 Expressive
+   grouped lists), chosen 2026-10-19 from four mockups: Gemini's page colour
+   behind, rows on its input-card colour grouped into one rounded block with 2px
+   gaps, the section heading in Gemini blue, the plan as a tonal chip, Material 3
+   switches scaled to 40x24. Colours are Gemini's lumi and gem tokens copied as values
+   (read off gemini.google.com that day); light and dark follow the browser. */
 :root {
-	--bg: #ffffff;
+	--bg: #faf9f9;              /* lumi surface: Gemini's page */
+	--surface: #f0f4f9;         /* gem surface-container: the input card */
+	--surface-high: #dde3ea;    /* gem surface-container-highest: an off switch */
 	--text: #000000;
 	--muted: rgba(0, 0, 0, 0.55);
-	--heading: rgba(0, 0, 0, 0.55);
+	--outline: #747775;
 	--hover: rgba(0, 0, 0, 0.08);
 	--track: rgba(0, 0, 0, 0.08);
 	--fill: #1157ce;
@@ -28,18 +30,23 @@
 	--fill-warn: #de2d29;
 	--primary: #0b57d0;
 	--on-primary: #ffffff;
-	--field: #f2f0f0;
+	--primary-container: #d3e3fd;
+	--on-primary-container: #0842a0;
 	--tip-bg: #000000;
 	--tip-text: #f2f0f0;
+	--menu: #ffffff;            /* lumi surface-bright: Gemini's menus */
+	--menu-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.12);
 	color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg: #1f1f1f;
+		--bg: #0f0f0f;
+		--surface: #1e1f20;
+		--surface-high: #333537;
 		--text: #e6e6e6;
 		--muted: rgba(255, 255, 255, 0.55);
-		--heading: #8e918f;
+		--outline: #8e918f;
 		--hover: rgba(230, 230, 230, 0.08);
 		--track: rgba(255, 255, 255, 0.12);
 		--fill: #4e8ff8;
@@ -47,9 +54,12 @@
 		--fill-warn: #ff4c45;
 		--primary: #a8c7fa;
 		--on-primary: #062e6f;
-		--field: #171717;
+		--primary-container: #1f3760;
+		--on-primary-container: #d3e3fd;
 		--tip-bg: #e6e6e6;
 		--tip-text: #171717;
+		--menu: #1f1f1f;
+		--menu-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.28);
 	}
 }
 
@@ -64,28 +74,32 @@
 body {
 	width: 320px;
 	margin: 0;
-	padding: 8px;
+	padding: 8px 12px 12px;
 	background: var(--bg);
 	color: var(--text);
 	/* System UI before Roboto and Helvetica: where Google Sans is not installed,
 	   it is the closest in width and tracking to Gemini's text. */
 	font-family: "Google Sans Flex", "Google Sans", "Google Sans Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-	font-size: 13px;
-	line-height: 17px;
+	font-size: 14px;
+	line-height: 20px;
 	font-variation-settings: "wdth" 92, "ROND" 0;
 	-webkit-font-smoothing: antialiased;
 }
 
-/* --- top bar: name and plan on the left, actions on the right ---------------- */
+h1,
+h2,
+p {
+	margin: 0;
+	font: inherit;
+}
+
+/* --- top bar: mark, name and plan, on every view --------------------------- */
 
 .top {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	height: 40px;
-	/* The last 20px glyph in its 32px button ends where the rows' text does. */
-	padding: 0 6px 0 12px;
+	height: 48px;
+	padding-left: 4px;
 }
 
 .top__name {
@@ -94,8 +108,8 @@ body {
 	gap: 8px;
 	min-width: 0;
 	overflow: hidden;
-	font-size: 14px;
-	line-height: 20px;
+	font-size: 18px;
+	line-height: 24px;
 	font-weight: 500;
 	font-variation-settings: "wdth" 92, "ROND" 0, "wght" 500;
 	white-space: nowrap;
@@ -111,62 +125,186 @@ body {
 	flex-shrink: 0;
 }
 
-/* Gemini's plan badge ("PRO"), a step smaller beside 14px text. */
+/* The plan ("PRO") as a Material tonal chip. */
 .badge {
 	flex-shrink: 0;
 	max-width: 88px;
-	padding: 2px 6px;
-	border-radius: 6px;
-	background: var(--field);
-	color: var(--muted);
+	padding: 2px 8px;
+	border-radius: 9999px;
+	background: var(--primary-container);
+	color: var(--on-primary-container);
 	font-size: 12px;
 	line-height: 16px;
-	font-weight: 540;
-	font-variation-settings: "wdth" 92, "ROND" 0, "wght" 540;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.top__actions {
-	display: flex;
-	align-items: center;
-	flex-shrink: 0;
+/* --- account picker: a pill like Gemini's model picker, opening its menu ------ */
+
+.account {
+	position: relative;
+	z-index: 10;
+	margin-top: 4px;
 }
 
-/* --- section heading, as Gemini's "Account" / "Preferences" ------------------ */
+.account__btn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	height: 40px;
+	padding: 0 12px 0 16px;
+	border: none;
+	border-radius: 9999px;
+	background: var(--surface);
+	color: var(--text);
+	font: inherit;
+	font-variation-settings: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.account__btn:hover,
+.account__btn[aria-expanded='true'] {
+	background-image: linear-gradient(var(--hover), var(--hover));
+}
+
+.account__name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.account__btn svg {
+	flex-shrink: 0;
+	color: var(--muted);
+	transition: transform 150ms ease;
+}
+
+.account__btn[aria-expanded='true'] svg {
+	transform: rotate(180deg);
+}
+
+/* One account: named, nothing to pick. */
+.account--single .account__btn {
+	cursor: default;
+}
+
+.account--single .account__btn:hover {
+	background-image: none;
+}
+
+.account--single .account__btn svg {
+	display: none;
+}
+
+/* Gemini's menu surface: radius 20, 8px in, rows radius 12 with a 20px leading
+   slot, here holding the check of the account shown. */
+.menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	padding: 8px;
+	border-radius: 20px;
+	background: var(--menu);
+	box-shadow: var(--menu-shadow);
+}
+
+.menu__item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	min-height: 40px;
+	padding: 0 12px;
+	border: none;
+	border-radius: 12px;
+	background: none;
+	color: var(--text);
+	font: inherit;
+	font-variation-settings: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.menu__item:hover {
+	background: var(--hover);
+}
+
+.menu__item::before {
+	content: '';
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+}
+
+.menu__item[aria-checked='true']::before {
+	width: 6px;
+	height: 11px;
+	margin: 0 7px 3px;
+	border: solid var(--primary);
+	border-width: 0 1.75px 1.75px 0;
+	transform: rotate(45deg);
+}
+
+.menu__name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.menu__plan {
+	flex-shrink: 0;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+/* --- the line under it: "Usage limits" in Gemini blue, the actions at its end,
+   as the Claude extension puts its "USAGE LIMITS" line ------------------------ */
 
 .head {
 	display: flex;
 	align-items: center;
-	padding: 8px 12px 0;
-	color: var(--heading);
+	margin: 8px 0 8px 4px;
+	color: var(--primary);
+	font-weight: 500;
+	font-variation-settings: "wdth" 92, "ROND" 0, "wght" 500;
 }
 
-h1,
-h2 {
-	margin: 0;
-	font: inherit;
-	font-weight: 400;
+.actions {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	margin-left: auto;
 }
 
-/* Inside settings or feedback the heading is a sub-menu's: a back arrow, the
-   title in full colour, one 36px row. */
+/* Settings and feedback: the same heading, with a back arrow before it. The
+   actions stay at the line's end, the open panel's button lit. */
 .head--sub {
-	height: 36px;
-	padding: 0 12px 0 6px;
 	gap: 2px;
-	color: var(--text);
+	margin-left: 0;
 }
 
-/* "Updated just now" under the heading, as on Gemini's usage page. */
+#back {
+	color: inherit;
+}
+
+/* "Updated just now", centred under the limits. */
 .status {
-	margin: 0;
-	padding: 0 12px 8px;
-	color: var(--heading);
+	margin: 12px 4px 0;
+	text-align: center;
+	color: var(--muted);
+	font-size: 12px;
+	line-height: 16px;
 }
 
 .status:empty {
-	padding-bottom: 4px;
+	display: none;
 }
 
 /* A refresh that did not work is said in full colour, not as routine grey. */
@@ -174,18 +312,29 @@ h2 {
 	color: var(--text);
 }
 
-/* Settings groups, the same muted heading. */
-.group {
-	padding: 8px 12px;
-	color: var(--heading);
-}
+/* --- grouped rows: one rounded block, 2px between rows ----------------------- */
 
-/* --- a limit, laid out as the model picker's two-line rows -------------------- */
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
 
 .item {
 	display: block;
-	margin: 0;
-	padding: 8px 12px;
+	padding: 14px 16px;
+	border-radius: 4px;
+	background: var(--surface);
+}
+
+.item:first-child {
+	border-top-left-radius: 20px;
+	border-top-right-radius: 20px;
+}
+
+.item:last-child {
+	border-bottom-left-radius: 20px;
+	border-bottom-right-radius: 20px;
 }
 
 .item__line {
@@ -193,16 +342,35 @@ h2 {
 	align-items: baseline;
 	justify-content: space-between;
 	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.item__label {
+	font-size: 15px;
+	font-weight: 500;
+	font-variation-settings: "wdth" 92, "ROND" 0, "wght" 500;
+}
+
+.item__value {
+	color: var(--muted);
+	white-space: nowrap;
 }
 
 .item__sub {
 	display: block;
+	margin-top: 8px;
 	color: var(--muted);
+	font-size: 13px;
+	line-height: 18px;
+}
+
+p.item__sub {
+	margin: 0;
 }
 
 .track {
-	height: 6px;
-	margin: 6px 0;
+	position: relative;
+	height: 8px;
 	border-radius: 9999px;
 	background: var(--track);
 	overflow: hidden;
@@ -214,6 +382,19 @@ h2 {
 	border-radius: 9999px;
 	background: var(--fill);
 	transition: width 240ms ease, background-color 240ms ease;
+}
+
+/* Elapsed-time marker, as on the page: within the bar's height, in the text
+   colour, which reads on the fill and the track alike. */
+.marker {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	margin-left: -1px;
+	border-radius: 1px;
+	background: var(--text);
+	pointer-events: none;
 }
 
 /* No current reading: the empty bar is not "0% used". */
@@ -238,6 +419,7 @@ h2 {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	flex-shrink: 0;
 	width: 32px;
 	height: 32px;
 	padding: 0;
@@ -261,6 +443,8 @@ h2 {
 /* Gemini's focus ring: 1px, no offset. */
 .icon:focus-visible,
 .btn:focus-visible,
+.account__btn:focus-visible,
+.menu__item:focus-visible,
 .opt:has(input:focus-visible) {
 	outline: 1px solid var(--text);
 	outline-offset: 0;
@@ -279,6 +463,7 @@ h2 {
 	font-size: 13px;
 	line-height: 17px;
 	font-weight: 400;
+	font-variation-settings: "wdth" 92, "ROND" 0;
 	white-space: nowrap;
 	pointer-events: none;
 	opacity: 0;
@@ -300,23 +485,26 @@ h2 {
 	animation: gc-spin 0.7s linear infinite;
 }
 
-/* --- settings: menu rows, a switch at the end ---------------------------------- */
+/* Slower for people who ask for less motion, as on the page. */
+@media (prefers-reduced-motion: reduce) {
+	.icon--busy svg {
+		animation-duration: 2s;
+	}
+}
+
+/* --- settings: grouped rows, a Material 3 switch at the end ------------------ */
 
 .opt {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 8px;
-	height: 36px;
-	padding: 0 12px;
-	border-radius: 9999px;
+	gap: 12px;
+	min-height: 48px;
+	padding-top: 0;
+	padding-bottom: 0;
+	font-size: 15px;
 	cursor: pointer;
 	user-select: none;
-	transition: background-color 150ms ease;
-}
-
-.opt:hover {
-	background: var(--hover);
 }
 
 .opt input {
@@ -326,29 +514,31 @@ h2 {
 	height: 0;
 }
 
-/* Material 3's switch, sized to a 36px row: an outlined track and a small
-   thumb off, a filled track and a larger thumb on. */
+/* Material 3's switch, scaled to a 320px popup (its own 52x32 read too heavy,
+   2026-10-19): an outlined track and a 12px thumb off, a filled track and an
+   18px thumb on. */
 .sw {
 	position: relative;
 	flex-shrink: 0;
-	width: 32px;
-	height: 20px;
+	width: 40px;
+	height: 24px;
 	border-radius: 9999px;
-	border: 1.5px solid var(--muted);
-	transition: background-color 160ms ease, border-color 160ms ease;
+	border: 2px solid var(--outline);
+	background: var(--surface-high);
+	transition: background-color 200ms ease, border-color 200ms ease;
 }
 
 .sw::after {
 	content: '';
 	position: absolute;
 	top: 50%;
-	left: 3px;
-	width: 10px;
-	height: 10px;
-	margin-top: -5px;
+	left: 10px;
+	width: 12px;
+	height: 12px;
 	border-radius: 50%;
-	background: var(--muted);
-	transition: transform 160ms ease, width 160ms ease, height 160ms ease, margin 160ms ease, background-color 160ms ease;
+	background: var(--outline);
+	transform: translate(-50%, -50%);
+	transition: left 200ms ease, width 200ms ease, height 200ms ease, background-color 200ms ease;
 }
 
 .opt input:checked + .sw {
@@ -357,31 +547,26 @@ h2 {
 }
 
 .opt input:checked + .sw::after {
-	left: 2px;
-	width: 14px;
-	height: 14px;
-	margin-top: -7px;
+	left: 26px;
+	width: 18px;
+	height: 18px;
 	background: var(--on-primary);
-	transform: translateX(12.5px);
 }
 
 /* --- feedback ------------------------------------------------------------------ */
 
-.feedback {
-	padding: 0;
-}
-
 .feedback textarea {
 	display: block;
 	width: 100%;
-	min-height: 84px;
+	min-height: 96px;
 	resize: vertical;
-	padding: 8px 12px;
+	padding: 14px 16px;
 	border: none;
-	border-radius: 12px;
-	background: var(--field);
+	border-radius: 20px;
+	background: var(--surface);
 	color: var(--text);
 	font: inherit;
+	font-size: 15px;
 	font-variation-settings: inherit;
 }
 
@@ -394,8 +579,11 @@ h2 {
 	outline-offset: 0;
 }
 
-.feedback .item__sub {
-	margin: 8px 12px 0;
+.note {
+	margin: 8px 4px 0;
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 18px;
 }
 
 .btnRow {
@@ -403,12 +591,11 @@ h2 {
 	justify-content: flex-end;
 	gap: 8px;
 	margin-top: 12px;
-	padding: 0 4px 4px;
 }
 
-/* Gemini's text and filled buttons, at menu scale. */
+/* Material's text and filled buttons, 40px pills. */
 .btn {
-	height: 32px;
+	height: 40px;
 	padding: 0 16px;
 	border: none;
 	border-radius: 9999px;
@@ -426,6 +613,7 @@ h2 {
 }
 
 .btn--primary {
+	padding: 0 20px;
 	background: var(--primary);
 	color: var(--on-primary);
 }

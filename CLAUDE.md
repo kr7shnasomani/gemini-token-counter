@@ -108,33 +108,43 @@ symbol font "Luminous Symbols" (`download`, `refresh`, `article`, `notes`), draw
 SVG until then (`symbolIcon`). The tooltip is light in dark mode on purpose: that
 is Gemini's own (#e6e6e6 on #171717, measured on its Dictate button). The focus
 ring is Gemini's too: 1px in `--mat-focus-indicator-border-color`, no offset. The only
-part left out is the cache timer: Gemini has no prompt cache.
+part left out is the cache timer, on purpose (decided 2026-10-19): Google publishes no
+cache lifetime for the Gemini app, its pages carry no cache signal, and nothing says
+a cached turn uses less of the limit. The only figure found is for the API (Gemini
+4 Argon's developer guide: 15-20 minutes for prompts sharing 6,144 tokens or more),
+which is not the app. Add it only once measured: `jSf9Qc` gives each limit's
+remaining units, so a short message right after a reply versus one 30 minutes later
+in a long chat would show whether caching saves anything, and for how long.
 
-**The popup is one of Gemini's own menus, not the Claude extension's popup.** That
-popup copies a surface claude.ai has; Gemini has none like it. A first try drew
-Gemini's full-width usage page small (28px heading, card groups, 12px bars) and was
-rejected as badly structured (2026-10-19). It is now built from Gemini's compact
-menus as measured that day (the sidebar's settings menu, the model picker): a 320px
-`surface-bright` panel (#fff / #1f1f1f) padded 8px; a 40px top bar (icon, "Token
-Counter" 14px/20px weight 500, the plan badge, then refresh, settings, feedback as
-32px round buttons with 20px glyphs); a muted 13px/17px section heading padded 8px
-12px ("Usage limits", #8e918f in dark) with "Updated just now" under it, as the usage
-page puts it; and two-line rows like the model picker's: "Current usage" / "N% used",
-a 6px round bar, "Resets at 2:16 AM" in muted text. All text is 13px/17px, wdth 92,
-except the name (14px) and the badge (12px). Its words are the usage page's
-("Current usage", not the chip's "Hourly"). Settings and feedback replace the view as
-a Gemini sub-menu does: a back arrow beside the panel title, Escape goes back, focus
-moves into the panel and back to its button. Settings are 36px pill rows with a
-switch (`role="switch"`), grouped "In the chat" and "Usage row". A missing window
-keeps its row ("—", "Not reported yet"); a refresh that failed says so in full colour
-before the age of the figures, in a `role="status"` line. There is no link to the
-usage page (removed on request). Google Sans Flex is bundled
-(`src/vendor/google-sans-flex-latin.woff2`, OFL, Latin only, cut to width 92, weights
-400-540, optical sizes 12-14; 104 KB) and pinned by hash in `THIRD_PARTY_NOTICES.md`,
-so the popup has Gemini's type offline; a weight outside 400-540 or a non-Latin
-character falls back to system-ui. The content script does not need it: Gemini's
-page already loads the font. An independent audit of this design
-found 15 issues; all were applied but the usage-page link.
+**The popup is a page of Google's own settings, not the Claude extension's popup.**
+Two earlier designs were rejected on 2026-10-19: Gemini's usage page drawn small
+(badly structured), then a compact Gemini menu (13px rows; "pathetic"). Four mockups
+followed and the user chose "grouped settings", Material 3 Expressive grouped lists
+as Google's current settings draw them: a 320px popup on Gemini's page colour
+(#faf9f9 / #0f0f0f) padded 8px 12px 12px; a 48px top bar (24px icon, "Gemini Token
+Counter" 18px weight 500, the plan as a tonal chip); under it the account picker,
+then, as the Claude extension's "USAGE LIMITS" line, "Usage limits" as a 14px weight-500 heading in
+Gemini blue (`primary`) with refresh, settings, feedback as 32px round buttons at
+its end; the two limits as one group of rows on the input card's colour
+(#f0f4f9 / #1e1f20), 2px apart, the group's outer corners 20px and inner ones 4px;
+each row "Current usage" 15px weight 500 / "N% used" muted, an 8px round bar
+with the page's elapsed-time marker (2px, text colour, hidden when the reading
+contradicts the nominal length), "Resets at 2:16 AM" 13px muted; "Updated just now" 12px muted, centred under the group. Its
+words are the usage page's ("Current usage", not the chip's "Hourly"). The logo,
+name and actions stay on every view, as in the Claude extension; settings and
+feedback replace what is under them, the open panel's button lit, a back arrow
+before the blue title ("Settings", "Send feedback"). Escape goes back, focus moves into the panel
+and back to its button. Settings are five 48px rows in one group, no
+sub-headings (removed on request), with Material 3's switch scaled to 40x24 (its own
+52x32 read too heavy; `role="switch"`). Feedback is a 20px-radius field on the row colour and 40px pill
+buttons, "Open issue" as in the Claude extension. A missing window keeps its row ("—", "Not reported yet"); a
+refresh that failed says so in full colour before the age of the figures, in a
+`role="status"` line. There is no link to the usage page (removed on request).
+Google Sans Flex is bundled (`src/vendor/google-sans-flex-latin.woff2`, OFL, Latin
+only, cut to width 92, weights 400-540, optical sizes 12-14; 104 KB) and pinned by
+hash in `THIRD_PARTY_NOTICES.md`, so the popup has Gemini's type offline; a weight
+outside 400-540 or a non-Latin character falls back to system-ui. The content
+script does not need it: Gemini's page already loads the font.
 
 **Where things are placed.** The chip goes where the Claude extension puts it,
 the top left of the chat. Gemini has no title there (the title is only in the
@@ -206,12 +216,14 @@ grid, and a window 3 minutes old read 0%). So a window whose reset has passed is
 "unknown": `GC.currentWindow` replaces it with the next, empty, ending one length
 later, in the page, the snapshot seed and the popup, and usage is read to confirm
 it. Showing "—" there (as the Claude extension does) left the hourly figure blank
-until a manual refresh. The stored snapshot belongs to one signed-in account (`account`)
-and is only seeded on that account's pages.
+until a manual refresh. Each signed-in account has its own stored snapshot
+(`gc:usageSnapshot:N`), seeded only on that account's pages.
 
 **The popup refreshes on its own.** With the optional host permission it fetches
 `/u/N/app`, takes `SNlM0e`, `cfb2h` and `FdrFJe` from the inline page data, and
-calls `jSf9Qc` itself. The fetch of the app page is about 800 KB; it happens only on
+calls `jSf9Qc` itself; it keeps the account's email (`oPEP7c`) from that page, or
+none, never an older one. A `/u/N` that Google sends to another account's page
+(an account since signed out) is refused, not stored as N. The fetch of the app page is about 800 KB; it happens only on
 a click.
 
 **A number on screen must belong to what is on screen.** Each of these once did
@@ -278,8 +290,24 @@ The popup is a separate document and cannot read the content script's memory, bu
 it loads `src/content/constants.js` ahead of `popup.js`, so the storage keys,
 settings defaults, `GC.parseUsage`, `GC.currentWindow` and the batchexecute reader
 (`GC.batchAnswer`) exist once and are shared, not mirrored. The content script
-mirrors each usage reading into `gc:usageSnapshot` with its account and time; the
-popup renders that, so it works from any tab. Settings (`gc:settings`) are written by
+mirrors each usage reading into `gc:usageSnapshot:N` with its account, email and
+time; the popup renders one, so it works from any tab. **The account picker** is a
+40px pill under the top bar (Gemini's model-picker shape) naming the shown account by
+email, on every view, from the first reading (asked for: the email always shows). With
+two or more accounts it opens a Gemini menu with a check on the shown one; with one it
+has no chevron and does nothing. Settings are one set for all accounts
+(`gc:settings`); picking an account on the settings view leaves it open. The person
+picks; the popup never switches on its own. The pick is kept
+in `gc:popupAccount`; before any pick it shows the newest reading. Refresh reads the
+account shown at the click and merges into that account's own reading, even if
+another is picked while it runs. An account with no reading for 30 days is deleted
+when the popup opens (`FORGET_ACCOUNT_MS`), so a signed-out account's email does not
+linger. The email comes from the page's inline data (`"oPEP7c"`, beside
+`SNlM0e`, `GC.pageEmail`), read from `document.scripts` by the content script and from
+the fetched app page by the popup; with none, it reads "Account N+1" (`/u/1` is "Account 2";
+people count from one). It is
+personal data: kept in local storage only, never in `gc:diag` or a report (a page test
+checks `gc:diag`, and a popup test the issue URL a report actually opens), and PRIVACY.md says so. Settings (`gc:settings`) are written by
 the popup and applied by `ui.applySettings()` through `storage.onChanged`, so open
 tabs change without a reload. Visibility is decided by settings **and** data: a
 setting never reveals a part with nothing behind it. A setting that fails to save
@@ -301,7 +329,10 @@ has no layout, so a part always counts as painted there.
 so a test that runs usage through `main.js` uses `liveUsage()`, which moves them to
 now. `page.test.js` runs every content script and `main.js` with a fake bridge;
 `bridge.test.js` runs the real bridge against a fake fetch speaking Gemini's envelope,
-and checks the popup's reader (`GC.batchAnswer`) agrees with it; `parsing.test.js`
+and checks the popup's reader (`GC.batchAnswer`) agrees with it; `popup.test.js` runs
+`popup.js` on a page built from `popup.html`'s ids (the account picker and its keys,
+picking, forgetting, refresh including one with another account picked mid-flight,
+its failures, and the URL a bug report opens); `parsing.test.js`
 covers turn parsing and counting against a real conversation; `packaging.test.js`
 the version and icon files; `security.test.js` is a guard (no eval or innerHTML,
 permissions unchanged, the bridge can call exactly the two read RPCs, actions pinned,

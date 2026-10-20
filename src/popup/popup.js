@@ -8,6 +8,9 @@
 	// GitHub does not publish its limit; long links fail at around 8 KB.
 	const MAX_ISSUE_URL = 7000;
 	const GEMINI_ORIGIN = 'https://gemini.google.com';
+	// An account with no reading for this long is forgotten, email and all: one
+	// signed out of the browser would otherwise stay in the picker for good.
+	const FORGET_ACCOUNT_MS = 30 * 24 * 60 * 60 * 1000;
 
 	const sameDay = (a, b) => a.toDateString() === b.toDateString();
 	const clock = (d) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -30,18 +33,27 @@
 		return sameDay(d, new Date()) ? `Updated at ${clock(d)}` : `Updated ${day(d)} at ${clock(d)}`;
 	}
 
+	/** The elapsed-time marker, as on the page (`GC.windowElapsed`). */
+	function placeMarker(el, resetMs, key) {
+		const at = GC.windowElapsed(resetMs, key);
+		el.hidden = typeof at?.pct !== 'number';
+		if (!el.hidden) el.style.left = `${at.pct}%`;
+	}
+
 	/** One limit's row; true if it had a reading. A row without one keeps its slot. */
 	function renderWindow(win, key) {
 		const row = document.getElementById(`${key}Row`);
 		const valueEl = document.getElementById(`${key}Value`);
 		const fillEl = document.getElementById(`${key}Fill`);
 		const resetEl = document.getElementById(`${key}Reset`);
+		const markerEl = document.getElementById(`${key}Marker`);
 		const blank = (sub) => {
 			valueEl.textContent = '\u2014';
 			resetEl.textContent = sub;
 			fillEl.style.width = '0';
 			fillEl.classList.remove('caution', 'warn');
 			row.classList.add('item--stale');
+			markerEl.hidden = true;
 		};
 		if (!win || typeof win.utilization !== 'number') {
 			blank('Not reported yet');
@@ -56,44 +68,142 @@
 		resetEl.textContent = formatReset(win.resets_at);
 		// A reading above zero always shows as a dot at least, as Gemini's own bar does.
 		fillEl.style.width = pct > 0 ? `max(${pct}%, 4px)` : '0';
-		fillEl.classList.toggle('caution', pct >= 75 && pct < 90);
-		fillEl.classList.toggle('warn', pct >= 90);
+		const level = GC.usageLevel(pct);
+		fillEl.classList.toggle('caution', level === 'caution');
+		fillEl.classList.toggle('warn', level === 'warn');
+		placeMarker(markerEl, Date.parse(win.resets_at), key);
 		return true;
 	}
 
-	/** The account in the path is 0-based (`/u/1` is the second); people count from one. */
-	const accountLabel = (account) => (account && account !== '0' ? `Account ${Number(account) + 1}` : '');
+	/** What the picker calls an account: its email, or its number when the page gave none
+	    (the path's is 0-based, `/u/1` is the second; people count from one). */
+	const accountName = (snap) => snap?.email || `Account ${Number(snap?.account || 0) + 1}`;
 
-	/** The line under the heading: how old the figures are, plus what a refresh just did. */
+	// --- account picker ---------------------------------------------------------
+	// Every account a Gemini tab has read usage for has its own stored reading. The
+	// account shown is always named, on every view; with more than one, the person
+	// picks which, and it is never switched for them. The pick is remembered.
+
+	const menu = () => document.getElementById('accountMenu');
+	const menuButton = () => document.getElementById('accountBtn');
+	const picking = () => Object.keys(accounts).length > 1;
+
+	/** The shown account: its plan chip and its name in the picker. */
+	function renderPicker() {
+		const chip = document.getElementById('plan');
+		chip.textContent = current?.plan || '';
+		chip.title = current?.plan || '';
+		chip.hidden = !current?.plan;
+		const row = document.getElementById('accountRow');
+		row.hidden = !current;
+		// With one account there is nothing to pick: the name shows, and nothing
+		// tells a screen reader it opens a menu.
+		row.classList.toggle('account--single', !picking());
+		if (picking()) {
+			menuButton().setAttribute('aria-haspopup', 'menu');
+			menuButton().setAttribute('aria-expanded', String(!menu().hidden));
+		} else {
+			menuButton().removeAttribute('aria-haspopup');
+			menuButton().removeAttribute('aria-expanded');
+		}
+		if (row.hidden || !picking()) closeMenu(false);
+		if (row.hidden) return;
+		document.getElementById('accountName').textContent = accountName(current);
+		const list = Object.values(accounts).sort((a, b) => Number(a.account) - Number(b.account));
+		menu().replaceChildren(...list.map((snap) => {
+			const item = document.createElement('button');
+			item.type = 'button';
+			item.className = 'menu__item';
+			item.setAttribute('role', 'menuitemradio');
+			item.setAttribute('aria-checked', String(snap.account === current?.account));
+			item.dataset.account = snap.account;
+			const name = document.createElement('span');
+			name.className = 'menu__name';
+			name.textContent = accountName(snap);
+			const plan = document.createElement('span');
+			plan.className = 'menu__plan';
+			plan.textContent = snap.plan || '';
+			item.append(name, plan);
+			return item;
+		}));
+	}
+
+	function openMenu() {
+		menu().hidden = false;
+		menuButton().setAttribute('aria-expanded', 'true');
+		(menu().querySelector('[aria-checked="true"]') || menu().firstElementChild)?.focus();
+	}
+
+	function closeMenu(refocus) {
+		if (menu().hidden) return;
+		menu().hidden = true;
+		menuButton().setAttribute('aria-expanded', 'false');
+		if (refocus) menuButton().focus();
+	}
+
+	function pickAccount(account) {
+		if (!accounts[account]) return;
+		current = accounts[account];
+		Promise.resolve(storage.set({ [GC.POPUP_ACCOUNT_KEY]: account })).catch(() => {});
+		closeMenu(true);
+		// Settings and feedback stay open; only the usage view has figures to swap.
+		if (panel === 'usage') render();
+		else renderPicker();
+	}
+
+	function wirePicker() {
+		menuButton().addEventListener('click', () => {
+			if (!picking()) return;
+			if (menu().hidden) openMenu();
+			else closeMenu(true);
+		});
+		menu().addEventListener('click', (e) => {
+			const item = e.target.closest('.menu__item');
+			if (item) pickAccount(item.dataset.account);
+		});
+		menu().addEventListener('keydown', (e) => {
+			// What role="menu" promises a keyboard user: arrows move, Tab leaves.
+			if (e.key === 'Tab') {
+				e.preventDefault();
+				closeMenu(true);
+				return;
+			}
+			if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+			e.preventDefault();
+			const items = [...menu().children];
+			const at = items.indexOf(document.activeElement);
+			items[(at + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+		});
+		document.addEventListener('click', (e) => {
+			if (!document.getElementById('accountRow').contains(e.target)) closeMenu(false);
+		});
+	}
+
+	/** The line under the limits: how old the figures are, plus what a refresh just did. */
 	function setStatus(problem) {
 		const el = document.getElementById('stamp');
 		const parts = [];
 		if (problem) parts.push(problem);
-		if (current?.updatedAt) {
-			const age = formatStamp(current.updatedAt);
-			parts.push(problem ? age : [accountLabel(current.account), age].filter(Boolean).join(' \u00b7 '));
-		}
+		if (current?.updatedAt) parts.push(formatStamp(current.updatedAt));
 		el.textContent = parts.join('. ');
 		el.classList.toggle('status--problem', Boolean(problem));
 		el.title = current?.account && current.account !== '0' ? `gemini.google.com/u/${current.account}` : '';
 	}
 
-	function render(snapshot) {
+	/** The usage view for the account shown (`current`). */
+	function render() {
 		const empty = document.getElementById('empty');
 		const content = document.getElementById('content');
-		const plan = document.getElementById('plan');
-		plan.textContent = snapshot?.plan || '';
-		plan.title = snapshot?.plan || '';
-		plan.hidden = !snapshot?.plan;
+		renderPicker();
 		const showEmpty = () => {
 			empty.hidden = false;
 			content.hidden = true;
 			setStatus('');
 		};
-		if (!snapshot) return showEmpty();
+		if (!current) return showEmpty();
 
-		const hasSession = renderWindow(snapshot.session, 'session');
-		const hasWeekly = renderWindow(snapshot.weekly, 'weekly');
+		const hasSession = renderWindow(current.session, 'session');
+		const hasWeekly = renderWindow(current.weekly, 'weekly');
 		if (!hasSession && !hasWeekly) return showEmpty();
 
 		setStatus('');
@@ -123,6 +233,8 @@
 		const prefix = account && account !== '0' ? `/u/${account}` : '';
 		const page = await fetch(`${GEMINI_ORIGIN}${prefix}/app`, { credentials: 'include' });
 		if (!page.ok) throw new Error(String(page.status));
+		// An account no longer signed in is sent to another one's page: not its figures.
+		if (prefix && page.url && !new URL(page.url).pathname.startsWith(`${prefix}/`)) return { signedOut: true };
 		const html = await page.text();
 		const field = (name) => (html.match(new RegExp(`"${name}":"([^"]+)"`)) || [])[1] || '';
 		const at = field('SNlM0e');
@@ -135,7 +247,7 @@
 			body: new URLSearchParams({ 'f.req': JSON.stringify([[['jSf9Qc', '[]', null, 'generic']]]), at }).toString()
 		});
 		if (!res.ok) throw new Error(String(res.status));
-		return { data: GC.batchAnswer(await res.text(), 'jSf9Qc') };
+		return { data: GC.batchAnswer(await res.text(), 'jSf9Qc'), email: GC.pageEmail(html) };
 	}
 
 	async function refresh() {
@@ -145,25 +257,36 @@
 		button.classList.add('icon--busy');
 		button.setAttribute('aria-disabled', 'true');
 		document.getElementById('content').setAttribute('aria-busy', 'true');
+		// The account shown at the click. The person can pick another while this runs,
+		// and what this refresh says belongs under this account only.
+		const account = /^\d{1,2}$/.test(current?.account) ? current.account : '0';
+		const say = (problem) => {
+			if (!current || current.account === account) setStatus(problem);
+		};
 		try {
 			if (!(await requestHostAccess())) {
-				setStatus('Refreshing needs access to Gemini');
+				say('Refreshing needs access to Gemini');
 				return;
 			}
-			const account = /^\d{1,2}$/.test(current?.account) ? current.account : '0';
-			const { signedOut, data } = await fetchUsage(account);
+			const { signedOut, data, email } = await fetchUsage(account);
 			if (signedOut) {
-				setStatus('Sign in to Gemini to refresh');
+				say('Sign in to Gemini to refresh');
 				return;
 			}
 			const parsed = GC.parseUsage(data);
 			if (!parsed) throw new Error('no usage');
-			current = { ...(current || {}), account, session: parsed.session, weekly: parsed.weekly, updatedAt: Date.now() };
-			render(current);
-			await storage.set({ [GC.SNAPSHOT_KEY]: current });
+			// Merged into that account's own reading, never into whichever is shown now.
+			// The email is this page's: an old one could belong to an account since signed out.
+			const fresh = { ...accounts[account], account, email, session: parsed.session, weekly: parsed.weekly, updatedAt: Date.now() };
+			// Saved before it is shown, so a failed save leaves the old figures, as "Couldn't refresh" says.
+			await storage.set({ [GC.snapshotKey(account)]: fresh });
+			accounts[account] = fresh;
+			if (!current || current.account === account) current = fresh;
+			if (panel === 'usage') render();
+			else renderPicker();
 		} catch {
 			// Keep how old the figures on screen are; only add that this try failed.
-			setStatus("Couldn't refresh");
+			say("Couldn't refresh");
 		} finally {
 			button.classList.remove('icon--busy');
 			button.removeAttribute('aria-disabled');
@@ -175,13 +298,13 @@
 
 	const PANELS = {
 		usage: { title: 'Usage limits' },
-		settings: { title: 'Show on Gemini', panel: 'settings', button: 'settingsBtn' },
+		settings: { title: 'Settings', panel: 'settings', button: 'settingsBtn' },
 		feedback: { title: 'Send feedback', panel: 'feedback', button: 'feedbackBtn' }
 	};
 
 	let panel = 'usage';
 
-	/** Settings and feedback replace the usage view, as a Gemini sub-menu does, with a back arrow. */
+	/** Settings and feedback replace the usage view under the top bar, with a back arrow by their title. */
 	function showPanel(name) {
 		const from = panel;
 		panel = PANELS[name] ? name : 'usage';
@@ -196,12 +319,13 @@
 		document.getElementById('back').hidden = onUsage;
 		document.getElementById('stamp').hidden = !onUsage;
 		if (onUsage) {
-			render(current);
+			render();
 			// Back where the person left from: the button that opened the panel.
 			if (from !== 'usage') document.getElementById(PANELS[from].button).focus();
 		} else {
 			document.getElementById('content').hidden = true;
 			document.getElementById('empty').hidden = true;
+			renderPicker();
 			document.querySelector(panel === 'feedback' ? '#feedbackText' : '#settings input').focus();
 		}
 	}
@@ -336,20 +460,41 @@
 
 	const storage = GC.getStorage();
 	let current = null;
+	// Each account's stored reading, by its number in the path.
+	const accounts = {};
 	if (!storage) {
-		render(null);
+		render();
 		return;
 	}
 
-	GC.storageGet(GC.SNAPSHOT_KEY).then((items) => {
-		current = items?.[GC.SNAPSHOT_KEY] || null;
-		render(current);
-	});
+	Promise.resolve(storage.get(null))
+		.then((items) => {
+			const forgotten = [];
+			for (const [key, snap] of Object.entries(items || {})) {
+				if (!key.startsWith(`${GC.SNAPSHOT_KEY}:`) || !/^\d{1,2}$/.test(snap?.account)) continue;
+				if (!(Date.now() - (snap.updatedAt || 0) < FORGET_ACCOUNT_MS)) forgotten.push(key);
+				else accounts[snap.account] = snap;
+			}
+			if (forgotten.length) Promise.resolve(storage.remove(forgotten)).catch(() => {});
+			// The account picked last time, else the one read most recently.
+			current = accounts[items?.[GC.POPUP_ACCOUNT_KEY]]
+				|| Object.values(accounts).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0]
+				|| null;
+			render();
+		})
+		.catch(() => {
+			render();
+			setStatus("Couldn't read saved usage");
+		});
 
 	document.getElementById('back').addEventListener('click', () => showPanel('usage'));
 	document.addEventListener('keydown', (e) => {
-		// Escape steps back to usage first; only from there does it close the popup.
-		if (e.key === 'Escape' && panel !== 'usage') {
+		// Escape closes the account menu, then steps back to usage; only from there
+		// does it close the popup.
+		if (e.key === 'Escape' && !menu().hidden) {
+			e.preventDefault();
+			closeMenu(true);
+		} else if (e.key === 'Escape' && panel !== 'usage') {
 			e.preventDefault();
 			showPanel('usage');
 		}
@@ -358,6 +503,7 @@
 		if (panel !== 'usage') showPanel('usage');
 		refresh();
 	});
+	wirePicker();
 	wireSettings();
 	wireFeedback();
 })();

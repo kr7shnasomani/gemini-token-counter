@@ -186,9 +186,10 @@
 		const resetMs = win.resets_at ? Date.parse(win.resets_at) : null;
 		span.textContent = `${label}: ${Math.round(win.utilization)}%${resetMs ? ` (resets in ${formatResetCountdown(resetMs)})` : ''}`;
 		const width = Math.max(0, Math.min(100, win.utilization));
+		const level = GC.usageLevel(width);
 		fill.style.width = `${width}%`;
-		fill.classList.toggle('gc-caution', width >= 75 && width < 90);
-		fill.classList.toggle('gc-warn', width >= 90);
+		fill.classList.toggle('gc-caution', level === 'caution');
+		fill.classList.toggle('gc-warn', level === 'warn');
 		return resetMs;
 	}
 
@@ -782,29 +783,21 @@
 		}
 
 		/**
-		 * Place both elapsed-time markers, or withdraw them. No payload states how long
-		 * a window is, so its start is inferred as `resets_at - nominal`. A window can
-		 * never have meaningfully more time left than it is long, so a reading that
-		 * does proves the nominal wrong for this account, and the marker hides itself
-		 * for good (latched: later readings look ordinary while the marker would be
-		 * badly misplaced).
+		 * Place both elapsed-time markers, or withdraw them (`GC.windowElapsed`). A
+		 * reading that proves the nominal length wrong hides the marker for good
+		 * (latched: later readings look ordinary while the marker would be badly
+		 * misplaced).
 		 */
 		_updateMarkers() {
-			const now = Date.now();
-			const place = (marker, resetMs, windowMs, latchKey) => {
-				const known = resetMs && Number.isFinite(resetMs);
-				if (known && resetMs - now > windowMs + GC.CONST.WINDOW_NOMINAL_TOLERANCE_MS) this[latchKey] = true;
-				const remaining = known ? resetMs - now : 0;
-				if (!known || this[latchKey] || remaining <= 0) {
-					marker.classList.add('gc-hidden');
-					return;
-				}
-				const pct = Math.max(0, Math.min(100, ((windowMs - remaining) / windowMs) * 100));
-				marker.style.left = `${pct}%`;
-				marker.classList.remove('gc-hidden');
+			const place = (marker, resetMs, key, latchKey) => {
+				const at = GC.windowElapsed(resetMs, key);
+				if (at?.tooLong) this[latchKey] = true;
+				const hide = this[latchKey] || typeof at?.pct !== 'number';
+				if (!hide) marker.style.left = `${at.pct}%`;
+				marker.classList.toggle('gc-hidden', hide);
 			};
-			place(this.sessionMarker, this.sessionResetMs, GC.CONST.SESSION_WINDOW_MS, 'sessionWindowLengthUnknown');
-			place(this.weeklyMarker, this.weeklyResetMs, GC.CONST.WEEKLY_WINDOW_MS, 'weeklyWindowLengthUnknown');
+			place(this.sessionMarker, this.sessionResetMs, 'session', 'sessionWindowLengthUnknown');
+			place(this.weeklyMarker, this.weeklyResetMs, 'weekly', 'weeklyWindowLengthUnknown');
 		}
 
 		/**

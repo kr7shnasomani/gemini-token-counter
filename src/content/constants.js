@@ -34,7 +34,11 @@
 
 	GC.SETTINGS_KEY = 'gc:settings';
 	GC.DIAG_KEY = 'gc:diag';
+	// One usage reading per signed-in account, `gc:usageSnapshot:1` for `/u/1`.
 	GC.SNAPSHOT_KEY = 'gc:usageSnapshot';
+	GC.snapshotKey = (account) => `${GC.SNAPSHOT_KEY}:${account}`;
+	// The account the popup was last switched to.
+	GC.POPUP_ACCOUNT_KEY = 'gc:popupAccount';
 
 	// This file is also loaded by the popup, so what both sides need lives here once.
 
@@ -51,6 +55,22 @@
 			return (await GC.getStorage()?.get(key)) || null;
 		} catch {
 			return null;
+		}
+	};
+
+	/**
+	 * The signed-in email from a Gemini page's inline data (`"oPEP7c":"…"`, beside
+	 * `SNlM0e`; seen 2026-10-19). It names the account in the popup's picker and is
+	 * kept in extension storage only, never in a report. '' when absent or odd.
+	 */
+	GC.pageEmail = (text) => {
+		const m = String(text || '').match(/"oPEP7c":("(?:[^"\\]|\\.){3,320}")/);
+		if (!m) return '';
+		try {
+			const email = JSON.parse(m[1]);
+			return /^[^\s@]{1,64}@[^\s@]{1,255}$/.test(email) ? email : '';
+		} catch {
+			return '';
 		}
 	};
 
@@ -85,10 +105,6 @@
 		return out.session || out.weekly ? out : null;
 	};
 
-	/**
-	 * Has this window's reset already passed? Then its figure is not old but wrong:
-	 * the window has rolled over. One rule for the page and the popup.
-	 */
 	/**
 	 * The payload of `rpc` in a batchexecute answer, or null. The same reader as the
 	 * bridge's `frames()` (which runs in the page world and cannot load this file):
@@ -131,7 +147,32 @@
 		}
 	};
 
+	/**
+	 * Has this window's reset already passed? Then its figure is not old but wrong:
+	 * the window has rolled over. One rule for the page and the popup.
+	 */
 	GC.windowEnded = (w) => !!w?.resets_at && Date.parse(w.resets_at) <= Date.now();
+
+	/** A window's nominal length: 5 hours, or 7 days for the weekly one. */
+	GC.windowLength = (key) => (key === 'weekly' ? GC.CONST.WEEKLY_WINDOW_MS : GC.CONST.SESSION_WINDOW_MS);
+
+	/**
+	 * Where the elapsed-time marker goes: how far through its window the clock is,
+	 * 0-100, its start inferred as `resets_at - nominal`. null when it cannot be
+	 * placed: no reset, a window that has ended, or `tooLong`, a reading with
+	 * meaningfully more time left than the window is long, which proves the
+	 * nominal length wrong for this account.
+	 */
+	GC.windowElapsed = (resetMs, key) => {
+		const length = GC.windowLength(key);
+		const remaining = resetMs - Date.now();
+		if (!(remaining > 0)) return null;
+		if (remaining > length + GC.CONST.WINDOW_NOMINAL_TOLERANCE_MS) return { tooLong: true };
+		return { pct: Math.max(0, Math.min(100, ((length - remaining) / length) * 100)) };
+	};
+
+	/** How urgent a limit looks, the same on the page and in the popup. */
+	GC.usageLevel = (pct) => (pct >= 90 ? 'warn' : pct >= 75 ? 'caution' : '');
 
 	/**
 	 * The window running now, given a reading whose reset may have passed. Gemini's
@@ -144,7 +185,7 @@
 	 */
 	GC.currentWindow = (w, key) => {
 		if (!w || !GC.windowEnded(w)) return w;
-		const length = key === 'weekly' ? GC.CONST.WEEKLY_WINDOW_MS : GC.CONST.SESSION_WINDOW_MS;
+		const length = GC.windowLength(key);
 		const ended = Date.parse(w.resets_at);
 		const next = ended + (Math.floor((Date.now() - ended) / length) + 1) * length;
 		return { utilization: 0, resets_at: new Date(next).toISOString(), rolled: true };

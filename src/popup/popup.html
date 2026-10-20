@@ -8,15 +8,40 @@
 </head>
 
 <body>
-	<!-- Built as one of Gemini's own menus (its settings menu, its model picker):
-	     a top bar, then a muted section heading over compact rows. -->
+	<!-- Built as a page of Google's own settings (Material 3 Expressive grouped
+	     lists): the name on every view, a line with the section heading in Gemini
+	     blue and the actions, then rows grouped into one rounded block, 2px apart. -->
 	<header class="top">
 		<div class="top__name">
-			<img class="top__mark" src="../../icons/icon96.png" alt="" width="20" height="20" />
-			<span>Token Counter</span>
+			<img class="top__mark" src="../../icons/icon96.png" alt="" width="24" height="24" />
+			<span>Gemini Token Counter</span>
 			<span class="badge" id="plan" hidden></span>
 		</div>
-		<div class="top__actions">
+	</header>
+
+	<!-- Which signed-in account the popup shows, from the first reading. With more
+	     than one it opens a menu; picked by the person, never switched on our own. -->
+	<div class="account" id="accountRow" hidden>
+		<button class="account__btn" id="accountBtn" type="button" aria-haspopup="menu" aria-expanded="false"
+			aria-controls="accountMenu">
+			<span class="account__name" id="accountName"></span>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+				stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+				<path d="M7 10l5 5 5-5" />
+			</svg>
+		</button>
+		<div class="menu" id="accountMenu" role="menu" aria-label="Accounts" hidden></div>
+	</div>
+
+	<div class="head">
+		<button class="icon" id="back" type="button" aria-label="Back to usage limits" hidden>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+				stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+				<path d="M19 12H5M11 6l-6 6 6 6" />
+			</svg>
+		</button>
+		<h1 class="head__title" id="title">Usage limits</h1>
+		<div class="actions">
 			<button class="icon" id="refresh" type="button" aria-label="Refresh usage" data-tip="Refresh">
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
 					stroke-linejoin="round" width="20" height="20" aria-hidden="true">
@@ -42,61 +67,55 @@
 				</svg>
 			</button>
 		</div>
-	</header>
-
-	<div class="head">
-		<button class="icon" id="back" type="button" aria-label="Back to usage limits" hidden>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-				stroke-linejoin="round" width="20" height="20" aria-hidden="true">
-				<path d="M19 12H5M11 6l-6 6 6 6" />
-			</svg>
-		</button>
-		<h1 class="head__title" id="title">Usage limits</h1>
 	</div>
-	<p class="status" id="stamp" role="status" aria-live="polite"></p>
-
-	<div id="content" hidden>
+	<div class="list" id="content" hidden>
 		<section class="item" id="sessionRow">
 			<div class="item__line">
-				<span>Current usage</span>
-				<span id="sessionValue"></span>
+				<span class="item__label">Current usage</span>
+				<span class="item__value" id="sessionValue"></span>
 			</div>
 			<div class="track">
 				<div class="fill" id="sessionFill"></div>
+				<div class="marker" id="sessionMarker" hidden></div>
 			</div>
 			<span class="item__sub" id="sessionReset"></span>
 		</section>
 
 		<section class="item" id="weeklyRow">
 			<div class="item__line">
-				<span>Weekly limit</span>
-				<span id="weeklyValue"></span>
+				<span class="item__label">Weekly limit</span>
+				<span class="item__value" id="weeklyValue"></span>
 			</div>
 			<div class="track">
 				<div class="fill" id="weeklyFill"></div>
+				<div class="marker" id="weeklyMarker" hidden></div>
 			</div>
 			<span class="item__sub" id="weeklyReset"></span>
 		</section>
 	</div>
 
-	<p class="item item__sub" id="empty">No usage read yet. Refresh, or open Gemini.</p>
+	<div class="list" id="empty">
+		<p class="item item__sub">No usage read yet. Refresh, or open Gemini.</p>
+	</div>
+	<p class="status" id="stamp" role="status" aria-live="polite"></p>
 
 	<div id="settings" hidden>
-		<h2 class="group">In the chat</h2>
-		<label class="opt"><span>Token counter</span><input type="checkbox" role="switch" data-key="tokenCounter" /><span class="sw"></span></label>
-		<label class="opt"><span>Export button</span><input type="checkbox" role="switch" data-key="exportButton" /><span class="sw"></span></label>
-		<h2 class="group">Usage row</h2>
-		<label class="opt"><span>Hourly bar</span><input type="checkbox" role="switch" data-key="sessionBar" /><span class="sw"></span></label>
-		<label class="opt"><span>Weekly bar</span><input type="checkbox" role="switch" data-key="weeklyBar" /><span class="sw"></span></label>
-		<label class="opt"><span>Refresh button</span><input type="checkbox" role="switch" data-key="usageRefresh" /><span class="sw"></span></label>
+		<div class="list">
+			<label class="item opt"><span>Token counter</span><input type="checkbox" role="switch" data-key="tokenCounter" /><span class="sw"></span></label>
+			<label class="item opt"><span>Export button</span><input type="checkbox" role="switch" data-key="exportButton" /><span class="sw"></span></label>
+			<label class="item opt"><span>Hourly bar</span><input type="checkbox" role="switch" data-key="sessionBar" /><span class="sw"></span></label>
+			<label class="item opt"><span>Weekly bar</span><input type="checkbox" role="switch" data-key="weeklyBar" /><span class="sw"></span></label>
+			<label class="item opt"><span>Refresh button</span><input type="checkbox" role="switch" data-key="usageRefresh" /><span class="sw"></span></label>
+		</div>
 	</div>
 
 	<div class="feedback" id="feedback" hidden>
-		<textarea id="feedbackText" rows="4" placeholder="Describe the issue" aria-label="Describe the issue"></textarea>
-		<p class="item__sub" id="feedbackNote">Opens a GitHub issue for you to check first. It adds your version, browser, plan and page details, never chat text.</p>
+		<textarea id="feedbackText" rows="4" placeholder="Describe the issue" aria-label="Describe the issue"
+			aria-describedby="feedbackNote"></textarea>
+		<p class="note" id="feedbackNote">Opens a GitHub issue for you to check first. It adds your version, browser, plan and page details, never chat text.</p>
 		<div class="btnRow">
 			<button class="btn" id="feedbackCancel" type="button">Cancel</button>
-			<button class="btn btn--primary" id="feedbackSend" type="button">Continue to GitHub</button>
+			<button class="btn btn--primary" id="feedbackSend" type="button">Open issue</button>
 		</div>
 	</div>
 

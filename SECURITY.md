@@ -18,14 +18,20 @@ there.
 
 Everything runs locally. Nothing is sent anywhere except to gemini.google.com, and
 the requests it makes are the same ones the site already makes for itself: your
-usage limits (`jSf9Qc`) and the open conversation (`hNvQHb`).
+usage limits (`jSf9Qc`) and the open conversation (`hNvQHb`). A refresh pressed in
+the popup also loads Gemini's app page, for its request token and the account's
+email, before asking for usage.
 
 ## What is stored
 
-Four keys in local extension storage, never transmitted:
+These keys in local extension storage, never transmitted:
 
-- `gc:usageSnapshot` — the last usage reading, your plan name, and the number of
-  the signed-in account it belongs to (`1` for `/u/1`)
+- `gc:usageSnapshot:N`, one per signed-in account — that account's last usage
+  reading, its plan name, its number (`1` for `/u/1`) and its email address, read
+  from the Gemini page's own data so the popup's account picker can name it. The
+  email is never put in `gc:diag` or a bug report. An account with no reading for
+  30 days is deleted when the popup next opens
+- `gc:popupAccount` — which account you last picked in the popup
 - `gc:settings` — which on-page elements you have switched off
 - `gc:diag` — Gemini's build label, the theme, which page anchors were found, your
   plan label, which of the extension's elements are showing, where the last usage

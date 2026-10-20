@@ -6,14 +6,12 @@
 
 <p align="center"><b>A minimal browser extension that shows a live token count and Gemini's own usage limits on gemini.google.com, exports any conversation to Markdown or plain text, and puts your limits one click away from any tab</b></p>
 
-<p align="center">
-  The sister project of <a href="https://github.com/kr7shnasomani/claude-token-counter">Claude Token Counter</a>
-</p>
+<p align="center"><sub>An independent project. Not affiliated with, endorsed or sponsored by Google. Gemini and Google Sans are trademarks of Google LLC.</sub></p>
 
 ## Features
 
 - **Token count**: approximate token count for the open chat, in a pill at the top left of the conversation, drawn like Gemini's own buttons. Click it for a table of each Gemini model's context window on each plan
-- **Usage bars**: the 5-hour ("Hourly") and weekly limits from Gemini's own usage data, the same figures its [usage page](https://gemini.google.com/usage) shows, with reset countdowns. They sit inside the input box, which grows to hold them. Bars turn amber past 75% and red past 90%. A thin line marks how far through the window you are, so you can see whether you are using your allowance faster than the clock
+- **Usage bars**: the 5-hour ("Hourly") and weekly limits from Gemini's own usage data, the same figures its [usage page](https://gemini.google.com/usage) shows, with reset countdowns. They sit inside the input box, which grows to hold them. Bars turn amber at 75% and red at 90%. A thin line marks how far through the window you are, so you can see whether you are using your allowance faster than the clock
 - **Hover help**: every control explains itself in a tooltip drawn as Gemini draws its own, and the icons are Gemini's own glyphs
 - **Chat export**: download the open conversation as Markdown or plain text, including the documents Gemini wrote (Canvas, Deep Research reports) and the names of files you attached
 - **Toolbar popup**: click the extension icon from any tab for your limits, with a switch for each part of the extension and a one-click bug report
@@ -25,7 +23,7 @@ The extension requests a single permission, `storage`. It runs on gemini.google.
 
 | Dark | Light |
 | --- | --- |
-| ![Gemini Token Counter on gemini.google.com in dark mode](img/darkmode.jpg) | ![Gemini Token Counter on gemini.google.com in light mode](img/lightmode.jpg) |
+| ![Gemini Token Counter on gemini.google.com in dark mode](img/store-dark.jpg) | ![Gemini Token Counter on gemini.google.com in light mode](img/store-light.jpg) |
 
 The toolbar popup: your limits from any tab, a switch for each part, and a prefilled bug report.
 
@@ -70,7 +68,7 @@ Runs in the isolated content script world, declared in `manifest.json` against `
 - `conversation.js` turns Gemini's positional arrays into turns: your prompt, the names of files you attached, the reply Gemini chose, and the documents it wrote. Every field is read defensively, so a moved field reads as missing instead of breaking the page. The count runs prompts, replies and documents through a vendored `o200k_base` tokenizer (`src/vendor/o200k_base.js`). That is OpenAI's encoding, not Gemini's own, so the count is approximate and lower than Gemini's real figure, which also includes uploaded files, images, thinking and its own instructions.
 - `ui.js` renders the chip, the usage row, the export button and its menu, the context popover, and the shared tooltip. Colours are Gemini's own design tokens (`--lumi-sys-*`, `--gem-sys-*`), which Gemini sets on the page and switches itself for light and dark, so the extension follows Gemini's theme with no code of its own. The fonts are Gemini's (Google Sans Flex, in the same narrow cut), and the icons are glyphs from Gemini's own icon font once it has loaded.
 - `export.js` turns a conversation into a Markdown or plain text document, saved through a blob URL, so no `downloads` permission is needed.
-- `src/popup/*` is the toolbar popup, built like one of Gemini's own compact menus, with Google Sans Flex bundled so it has Gemini's typeface even off Gemini. It is a separate document and cannot read the content script's memory, so the content script mirrors each usage reading into `chrome.storage.local` and the popup renders that snapshot with its age. It loads `src/content/constants.js` too, so the storage keys, settings and parsing rules exist once and are shared.
+- `src/popup/*` is the toolbar popup, built like a page of Google's own settings, with Google Sans Flex bundled so it has Gemini's typeface even off Gemini. It is a separate document and cannot read the content script's memory, so the content script mirrors each account's usage reading into `chrome.storage.local` under its own key and the popup renders the chosen account's snapshot with its age. It loads `src/content/constants.js` too, so the storage keys, settings and parsing rules exist once and are shared.
 
 **3. Usage bars specifically**
 
@@ -111,13 +109,13 @@ An export contains every turn in order, with its time, your prompt, the reply Ge
 
 ## The popup
 
-Click the toolbar icon to see the current (5-hour) and weekly limits, with when each resets and how old the reading is. It works from any tab, not just Gemini, because it renders a stored snapshot rather than live data, and it shows which signed-in account the figures belong to. The bars use the same amber and red thresholds as the ones on the page.
+Click the toolbar icon to see the current (5-hour) and weekly limits, with when each resets and how old the reading is. It works from any tab, not just Gemini, because it renders a stored snapshot rather than live data. Each signed-in account keeps its own figures, and the popup always names the one shown by its email (or "Account N" when Gemini's page gives none); once you have used Gemini with more than one, that name opens a list of them and you choose which to show. The choice is remembered, and the extension never switches it for you; an account with no new reading for 30 days is dropped from the list. The bars use the same amber and red thresholds as the ones on the page, with the same thin line for how far through the window you are.
 
 The refresh button fetches current numbers. The first press asks for access to gemini.google.com; declining leaves everything else working. The popup asks for nothing at install time.
 
-The gear opens **Show on Gemini**, with a switch for each thing the extension adds: the token counter, the export button, the hourly and weekly bars, and the usage refresh button. Everything is on by default, changes apply to open tabs immediately, and the preferences live in extension storage.
+The gear opens **Settings**, with a switch for each thing the extension adds: the token counter, the export button, the hourly and weekly bars, and the usage refresh button. Everything is on by default, changes apply to open tabs immediately, and the preferences live in extension storage, shared by all accounts.
 
-The feedback icon opens a box for describing a problem. **Continue to GitHub** opens a prefilled issue on this repository for you to review and submit. It deliberately does not file the issue itself: that would mean shipping a GitHub token inside the extension, where anyone could extract it. The report carries your extension version, browser, plan, Gemini's build label, which of Gemini's page anchors were found, which parts of the extension are showing, where the last usage reading came from, any part that had to float, any settings you turned off, and the extension's last few error messages. It never carries conversation text or ids, and you see all of it before anything is sent.
+The feedback icon opens a box for describing a problem. **Open issue** opens a prefilled issue on this repository for you to review and submit. It deliberately does not file the issue itself: that would mean shipping a GitHub token inside the extension, where anyone could extract it. The report carries your extension version, browser, plan, Gemini's build label, which of Gemini's page anchors were found, which parts of the extension are showing, where the last usage reading came from, any part that had to float, any settings you turned off, and the extension's last few error messages. It never carries conversation text or ids, and you see all of it before anything is sent.
 
 ## Development
 
@@ -134,6 +132,7 @@ The suites run the shipped files in Node against a small DOM shim, so they exerc
 - `page.test.js` runs every content script and `main.js` against a page built in Gemini's shape, with a fake bridge: where each part lands, the usage row, reply detection, navigation, rollover, races between reads, failed refreshes, export, plan detection and the icons.
 - `bridge.test.js` runs the real bridge against a fake `fetch` that answers in Gemini's envelope format: paging, the page ceiling, refusals, origin checks, and that the popup reads answers the way the bridge does.
 - `parsing.test.js` parses and counts a real conversation captured from Gemini, and covers the window rules.
+- `popup.test.js` runs the real popup on a page built from `popup.html`: the account picker and its keyboard, picking, forgetting old accounts, refresh (including one with another account picked while it runs, and its failures), and the issue URL a bug report opens, which must never carry the account's email.
 - `packaging.test.js` checks the version agrees in its three places and every declared file exists.
 - `security.test.js` is a guard that fails on `eval`, `innerHTML`, widened permissions, a bridge that could call any other RPC, an unpinned GitHub Action, or a dependency that could execute code at install time.
 

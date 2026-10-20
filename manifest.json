@@ -5,7 +5,7 @@
   "minimum_chrome_version": "111",
   "permissions": ["storage"],
   "optional_host_permissions": ["https://gemini.google.com/*"],
-  "description": "Token counter and usage bars on Gemini. Export any chat to Markdown, and check your limits from the toolbar.",
+  "description": "Unofficial token counter and usage bars for Gemini. Export any chat to Markdown, and check your limits from the toolbar.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
