@@ -8,6 +8,8 @@
 
 <p align="center"><sub>An independent project. Not affiliated with, endorsed or sponsored by Google. Gemini and Google Sans are trademarks of Google LLC.</sub></p>
 
+https://github.com/user-attachments/assets/e712dc61-70e2-48b0-b3cd-e2ac814c071e
+
 ## Features
 
 - **Token count**: approximate token count for the open chat, in a pill at the top left of the conversation, drawn like Gemini's own buttons. Click it for a table of each Gemini model's context window on each plan
